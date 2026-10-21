@@ -1519,6 +1519,7 @@ hr{
       // === MESA / ROLETA ===
       { id: 'wheel', name: 'Wheel of Fortune', category: 'Mesa', icon: '🌀', risk: 'Médio', desc: 'Gire a roda colorida e acerte o setor para multiplicar sua aposta.', help: 'Como jogar:\n• Aposte em um setor (cores ou números).\n• Gire a roda.\n• Acertou o setor = ganha o multiplicador correspondente.' },
       { id: 'scratch', name: 'Scratch Card', category: 'Mesa', icon: '🎫', risk: 'Médio', desc: 'Raspe 3 áreas. 3 iguais = prêmio. Simples e viciante.', help: 'Como jogar:\n• Aposte e raspe as 3 áreas.\n• 3 símbolos iguais = prêmio (até 50x).\n• 2 iguais = 1.5x.' },
+      { id: 'giftboxes', name: 'Caixas Surpresa', category: 'Mesa', icon: '🎁', risk: 'Alto', desc: 'Três caixas. Duas escondem vento, uma esconde um saco de dinheiro (10x). Escolha com cuidado.', help: 'Como jogar:\n• Defina a aposta e clique em ABRIR CAIXAS.\n• Três caixas de presente aparecem fechadas.\n• Escolha uma e clique nela.\n• Se revelar 💰, você ganha 10x a aposta.\n• Se revelar 💨 (vento), perde a aposta.\n• Apenas uma das três caixas tem o prêmio.' },
       { id: 'keno', name: 'Keno', category: 'Mesa', icon: '🎱', risk: 'Alto', desc: 'Escolha até 5 números. A casa sorteia 10. Quanto mais acertos, maior o prêmio.', help: 'Como jogar:\n• Escolha de 1 a 5 números (1-40).\n• 10 números são sorteados.\n• Acertos pagam de 2x a 50x.' },
 
       // === SLOTS ===
@@ -1564,6 +1565,28 @@ hr{
       } catch (e) { return fallback; }
     };
     const saveStore = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {} };
+    const saveLobbyScroll = () => {
+      try {
+        const y = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+        window.__berimbetLobbyScrollY = y;
+        saveStore('berimbet_lobby_scroll_y', y);
+      } catch (e) {}
+    };
+    const restoreLobbyScroll = () => {
+      try {
+        let y = window.__berimbetLobbyScrollY;
+        if (y == null || !Number.isFinite(y)) y = loadStore('berimbet_lobby_scroll_y', 0);
+        y = Number(y) || 0;
+        const go = () => {
+          window.scrollTo(0, y);
+          document.documentElement.scrollTop = y;
+          document.body.scrollTop = y;
+        };
+        go();
+        requestAnimationFrame(() => { go(); requestAnimationFrame(go); });
+        [0, 30, 80, 160, 300, 500].forEach(ms => setTimeout(go, ms));
+      } catch (e) {}
+    };
 
     const AppStateContext = createContext();
     const useAppState = () => useContext(AppStateContext);
@@ -1906,7 +1929,7 @@ hr{
               favorites.map(favId => {
                 const game = GAMES.find(g => g.id === favId);
                 return game ? (
-                   <button key={favId} onClick={() => { saveStore('berimbet_lobby_scroll_y', window.scrollY); setActiveGame(game); setView('game'); closeMenu(); }} className="fav-item-in flex items-center w-full gap-3 p-2.5 rounded-lg hover:bg-slate-800 transition-colors text-left text-slate-400 hover:text-white text-sm">
+                   <button key={favId} onClick={() => { saveLobbyScroll(); setActiveGame(game); setView('game'); closeMenu(); }} className="fav-item-in flex items-center w-full gap-3 p-2.5 rounded-lg hover:bg-slate-800 transition-colors text-left text-slate-400 hover:text-white text-sm">
                      <span>{game.icon}</span> <span>{game.name}</span>
                    </button>
                 ) : null;
@@ -4330,6 +4353,8 @@ hr{
       const canvasRefs = useRef([]);
       const settledRef = useRef(false);
       const lastPt = useRef({});
+      const fadingRef = useRef({});
+      const fadeTimers = useRef({});
       const symbols = ['🍒','🍋','🔔','💎','7️⃣'];
 
       const paintCover = (canvas) => {
@@ -4360,6 +4385,9 @@ hr{
           ctx.lineTo(i * 14 - 30, rect.height);
           ctx.stroke();
         }
+        canvas.style.opacity = '1';
+        canvas.style.transition = 'none';
+        canvas.style.pointerEvents = 'auto';
       };
 
       const measureCleared = (canvas) => {
@@ -4388,13 +4416,33 @@ hr{
         if (canvas) {
           const ctx = canvas.getContext('2d');
           ctx.clearRect(0, 0, canvas.width, canvas.height);
+          canvas.style.opacity = '0';
         }
+        fadingRef.current[index] = false;
         setRevealed(r => {
           if (r[index]) return r;
           const nr = [...r];
           nr[index] = true;
           return nr;
         });
+      };
+
+      const startFade = (index) => {
+        if (fadingRef.current[index] || revealed[index]) return;
+        fadingRef.current[index] = true;
+        lastPt.current[index] = null;
+        const canvas = canvasRefs.current[index];
+        if (canvas) {
+          canvas.style.pointerEvents = 'none';
+          canvas.style.transition = 'opacity 1s ease-out';
+          void canvas.offsetWidth;
+          canvas.style.opacity = '0';
+        }
+        if (fadeTimers.current[index]) clearTimeout(fadeTimers.current[index]);
+        fadeTimers.current[index] = setTimeout(() => {
+          clearCell(index);
+          fadeTimers.current[index] = null;
+        }, 1000);
       };
 
       const start = () => {
@@ -4404,6 +4452,9 @@ hr{
         let final = Array.from({ length: 6 }, () => symbols[Math.floor(Math.random() * symbols.length)]);
         if (hackSettings.nextOutcome === 'win') final = ['7️⃣', '7️⃣', '7️⃣', '7️⃣', '🍒', '🍋'];
         if (hackSettings.nextOutcome === 'loss') final = ['🍒', '🍋', '🔔', '💎', '7️⃣', '🍋'];
+        Object.values(fadeTimers.current).forEach(t => t && clearTimeout(t));
+        fadeTimers.current = {};
+        fadingRef.current = {};
         setCells(final);
         setRevealed(Array(6).fill(false));
         setSt('scratching');
@@ -4413,7 +4464,7 @@ hr{
       };
 
       const scratch = (index, e) => {
-        if (st !== 'scratching' || revealed[index]) return;
+        if (st !== 'scratching' || revealed[index] || fadingRef.current[index]) return;
         const canvas = canvasRefs.current[index];
         if (!canvas) return;
         const rect = canvas.getBoundingClientRect();
@@ -4442,10 +4493,9 @@ hr{
         ctx.fill();
         lastPt.current[index] = { x, y };
 
-        // A cada movimento mede a área limpa; ≥70% → limpa o bloco inteiro
+        // ≥70% raspado → fade suave de 3s e some automaticamente
         if (measureCleared(canvas) >= 0.70) {
-          clearCell(index);
-          lastPt.current[index] = null;
+          startFade(index);
         }
       };
 
@@ -4469,7 +4519,11 @@ hr{
         }
       }, [revealed]);
 
-      useEffect(() => () => { betIdRef.current = null; }, []);
+      useEffect(() => () => {
+        betIdRef.current = null;
+        Object.values(fadeTimers.current).forEach(t => t && clearTimeout(t));
+        fadeTimers.current = {};
+      }, []);
 
       return (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center max-w-xl mx-auto space-y-5">
@@ -4499,6 +4553,177 @@ hr{
           <button onClick={start} disabled={st === 'scratching'} className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-3 rounded-lg disabled:opacity-50">
             {st === 'idle' || st === 'done' ? 'COMPRAR CARTELA' : 'RASPE OS QUADRADOS'}
           </button>
+        </div>
+      );
+    };
+
+    // --- CAIXAS SURPRESA ---
+    const GameGiftBoxes = () => {
+      const { placeBet, settleBet, hackSettings } = useAppState();
+      const [bet, setBet] = useState(10);
+      const [st, setSt] = useState('idle'); // idle | ready | revealing | done
+      const [boxes, setBoxes] = useState(['💨', '💨', '💰']);
+      const [picked, setPicked] = useState(null);
+      const [showAll, setShowAll] = useState(false);
+      const [opening, setOpening] = useState(null); // index sendo animado
+      const [animKey, setAnimKey] = useState(0);
+      const pendingId = useRef(null);
+
+      const shuffle = (arr) => {
+        const a = [...arr];
+        for (let i = a.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
+      };
+
+      const start = () => {
+        const id = placeBet(bet, 'Caixas Surpresa', `Aposta ${formatMoney(bet)}`);
+        if (!id) return;
+        pendingId.current = id;
+        setBoxes(shuffle(['💨', '💨', '💰']));
+        setPicked(null);
+        setShowAll(false);
+        setOpening(null);
+        setSt('ready');
+        sfx(hackSettings, 'button');
+      };
+
+      const openBox = (idx) => {
+        if (st !== 'ready' || picked !== null) return;
+        setPicked(idx);
+        setAnimKey(k => k + 1);
+        setOpening(idx);
+        setSt('revealing');
+        sfx(hackSettings, 'flip');
+
+        // prepara o resultado (sem notificar ainda)
+        let finalWin = boxes[idx] === '💰';
+        if (hackSettings.nextOutcome === 'loss') finalWin = false;
+        if (hackSettings.nextOutcome === 'win') finalWin = true;
+        const display = [...boxes];
+        if (finalWin && display[idx] !== '💰') {
+          const moneyAt = display.indexOf('💰');
+          if (moneyAt >= 0) { display[moneyAt] = '💨'; display[idx] = '💰'; }
+          else display[idx] = '💰';
+        } else if (!finalWin && display[idx] === '💰') {
+          display[idx] = '💨';
+          const other = [0, 1, 2].find(i => i !== idx);
+          if (other !== undefined) display[other] = '💰';
+        }
+
+        // no meio da animação só atualiza o conteúdo visual da caixa
+        setTimeout(() => { setBoxes(display); }, 500);
+
+        // animação 1.5s → estado aberto (mantém classe opening até o fim)
+        setTimeout(() => {
+          setShowAll(true);
+          setSt('done');
+        }, 1500);
+
+        // cooldown 1s após a animação → notificação de ganho/perda
+        setTimeout(() => {
+          setOpening(null);
+          sfx(hackSettings, finalWin ? 'win' : 'loss');
+          settleBet(pendingId.current, finalWin ? bet * 10 : 0, finalWin ? 'Saco de dinheiro · 10x' : 'Só vento');
+        }, 1500 + 1000);
+      };
+
+      const reset = () => {
+        setSt('idle');
+        setPicked(null);
+        setShowAll(false);
+        setOpening(null);
+        pendingId.current = null;
+      };
+
+      const GiftBox = ({ index, content, isPick, isOpen, isAnimating }) => {
+        const isMoney = content === '💰';
+        const phase = isAnimating ? 'opening' : (isOpen ? 'opened' : 'closed');
+        return (
+          <button
+            key={index}
+            type="button"
+            disabled={st !== 'ready'}
+            onClick={() => openBox(index)}
+            className={cn(
+              'gift-box-wrap',
+              phase,
+              st === 'ready' && 'is-pickable',
+              isPick && isOpen && isMoney && 'is-win',
+              isPick && isOpen && !isMoney && 'is-loss'
+            )}
+            aria-label={`Caixa ${index + 1}`}
+          >
+            <div className="gift-box-stage" key={isAnimating ? 'anim-' + animKey : 'idle-' + index}>
+              <div className={cn('gift-box-prize', (isOpen || isAnimating) && 'visible')}>
+                <span className="gift-box-prize-emoji">{content}</span>
+                <span className="gift-box-prize-label">{isMoney ? '10x' : 'vento'}</span>
+              </div>
+              <div className="gift-box-body">
+                <div className="gift-box-front" />
+                <div className="gift-box-ribbon-v" />
+                <div className="gift-box-ribbon-h" />
+                <div className="gift-box-num">{index + 1}</div>
+              </div>
+              <div className="gift-box-lid">
+                <div className="gift-box-lid-top" />
+                <div className="gift-box-lid-front" />
+                <div className="gift-box-bow">🎀</div>
+              </div>
+            </div>
+            <span className="gift-box-caption">CAIXA {index + 1}</span>
+          </button>
+        );
+      };
+
+      return (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center max-w-xl mx-auto space-y-5">
+          <div className="text-sm text-slate-400">
+            {st === 'idle' && 'Três caixas. Só uma esconde o saco de dinheiro (10x). As outras, só vento.'}
+            {st === 'ready' && 'Escolha uma caixa e clique para abrir.'}
+            {st === 'revealing' && 'Abrindo a caixa...'}
+            {st === 'done' && (boxes[picked] === '💰' ? 'Você encontrou o saco de dinheiro!' : 'Só vento desta vez.')}
+          </div>
+
+          <div className="flex justify-center items-end gap-5 sm:gap-8 py-6 min-h-[200px]">
+            {[0, 1, 2].map(i => (
+              GiftBox({
+                index: i,
+                content: boxes[i],
+                isPick: picked === i,
+                isOpen: picked === i || showAll,
+                isAnimating: opening === i
+              })
+            ))}
+          </div>
+
+          {st === 'done' && (
+            <div className={cn(
+              'anim-pop py-2 px-4 rounded-xl font-bold text-sm border inline-block',
+              boxes[picked] === '💰'
+                ? 'bg-emerald-950 border-emerald-500 text-emerald-300'
+                : 'bg-red-950 border-red-500 text-red-300'
+            )}>
+              {boxes[picked] === '💰' ? `+ ${formatMoney(bet * 10)}` : 'Aposta perdida'}
+            </div>
+          )}
+
+          {(st === 'idle' || st === 'done') && (
+            <>
+              <BetInput value={bet} onChange={setBet} disabled={st === 'ready' || st === 'revealing'} />
+              <button
+                onClick={st === 'done' ? reset : start}
+                className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-3 rounded-lg"
+              >
+                {st === 'done' ? 'NOVA RODADA' : 'ABRIR CAIXAS'}
+              </button>
+            </>
+          )}
+          {(st === 'ready' || st === 'revealing') && (
+            <div className="text-xs text-slate-500 font-mono">Aposta: {formatMoney(bet)} · Prêmio: {formatMoney(bet * 10)}</div>
+          )}
         </div>
       );
     };
@@ -5617,6 +5842,7 @@ hr{
     const Lobby = () => {
       const { setActiveGame, setView, toggleFavorite, favorites, balance, setBalance, searchQuery } = useAppState();
       const [cat, setCat] = useState('Todos');
+      useEffect(() => { restoreLobbyScroll(); }, []);
       const cats = ['Todos', ...new Set(GAMES.map(g => g.category))];
       const q = (searchQuery || '').trim().toLowerCase();
       const list = GAMES.filter(g => {
@@ -5632,7 +5858,7 @@ hr{
           {balance < FREE_LIMIT && (
             <div className="bg-emerald-950/60 border border-emerald-500/50 rounded-xl p-4 text-sm text-emerald-200 flex flex-wrap items-center justify-between gap-3">
               <span>🎁 Saldo baixo? O <b>Tiro na Garrafa</b> está liberado: ganhe de R$ 1,00 a R$ 10,00 por garrafa sem apostar.</span>
-              <button onClick={() => { saveStore('berimbet_lobby_scroll_y', window.scrollY); setActiveGame(GAMES.find(g => g.id === 'bottles')); setView('game'); }} className="play-btn font-black px-4 py-2 rounded-lg">Jogar grátis</button>
+              <button onClick={() => { saveLobbyScroll(); setActiveGame(GAMES.find(g => g.id === 'bottles')); setView('game'); }} className="play-btn font-black px-4 py-2 rounded-lg">Jogar grátis</button>
             </div>
           )}
           <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-1">
@@ -5655,7 +5881,7 @@ hr{
                     {game.risk && <span className={cn("px-2 py-0.5 rounded border", riskCls[game.risk])}>Risco: {game.risk}</span>}
                   </div>
                   <p className="text-slate-400 text-xs mb-4 flex-1 leading-relaxed">{game.desc}</p>
-                  <button onClick={() => { saveStore('berimbet_lobby_scroll_y', window.scrollY); setActiveGame(game); setView('game'); }} className="play-btn w-full font-black py-2.5 rounded-lg flex justify-center items-center gap-2"><Icon path={Icons.Play} className="w-4 h-4" />{game.free ? 'JOGAR GRÁTIS' : 'JOGAR AGORA'}</button>
+                  <button onClick={() => { saveLobbyScroll(); setActiveGame(game); setView('game'); }} className="play-btn w-full font-black py-2.5 rounded-lg flex justify-center items-center gap-2"><Icon path={Icons.Play} className="w-4 h-4" />{game.free ? 'JOGAR GRÁTIS' : 'JOGAR AGORA'}</button>
                 </div>
               </div>
             ))}
@@ -5739,8 +5965,7 @@ hr{
       const previousView = useRef(view);
       useEffect(() => {
         if (previousView.current === 'game' && view === 'lobby') {
-          const savedY = loadStore('berimbet_lobby_scroll_y', 0);
-          requestAnimationFrame(() => window.scrollTo({ top: savedY, left: 0, behavior: 'instant' }));
+          restoreLobbyScroll();
         }
         previousView.current = view;
       }, [view]);
@@ -5801,6 +6026,7 @@ hr{
                  {(activeGame.engine || activeGame.id) === 'pokerflash' && <GamePokerFlash />}
                  {(activeGame.engine || activeGame.id) === 'wheel' && <GameWheel />}
                  {(activeGame.engine || activeGame.id) === 'scratch' && <GameScratch />}
+                 {(activeGame.engine || activeGame.id) === 'giftboxes' && <GameGiftBoxes />}
                  {(activeGame.engine || activeGame.id) === 'keno' && <GameKeno />}
                  {(activeGame.engine || activeGame.id) === 'fruitslots' && <GameFruitSlots />}
                  {(activeGame.engine || activeGame.id) === 'diamondrush' && <GameDiamondRush />}
@@ -6005,6 +6231,162 @@ input,select,textarea{font-size:16px} /* evita zoom automático no iOS */
 }
 </style>
 
+<style id="gift-box-fx">
+  .gift-box-wrap {
+    background: transparent !important; border: 0 !important; padding: 0 !important;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    cursor: default; -webkit-tap-highlight-color: transparent;
+    box-shadow: none !important; filter: none !important;
+  }
+  .gift-box-wrap.is-pickable { cursor: pointer; }
+  .gift-box-wrap.is-pickable:hover .gift-box-stage { transform: translateY(-6px) scale(1.04); }
+  .gift-box-wrap:not(:disabled):hover,
+  .gift-box-wrap:not(:disabled):active { transform: none !important; filter: none !important; box-shadow: none !important; }
+  .gift-box-stage {
+    position: relative; width: 96px; height: 120px;
+    overflow: visible;
+    transition: transform .3s cubic-bezier(.22,1,.36,1);
+  }
+  @media (min-width: 640px) { .gift-box-stage { width: 112px; height: 136px; } }
+
+  .gift-box-body {
+    position: absolute; left: 12%; right: 12%; bottom: 6px; height: 52%;
+    border-radius: 6px 6px 10px 10px; overflow: hidden;
+    background: linear-gradient(160deg, #c0392b 0%, #8e1b1b 45%, #5c1010 100%);
+    border: 2px solid #f1d77a;
+    box-shadow: 0 10px 18px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.18);
+    z-index: 2;
+  }
+  .gift-box-front {
+    position: absolute; inset: 0;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.12), transparent 40%),
+      linear-gradient(90deg, transparent 42%, rgba(241,215,122,.9) 42%, rgba(241,215,122,.9) 58%, transparent 58%);
+  }
+  .gift-box-ribbon-v {
+    position: absolute; top: 0; bottom: 0; left: 50%; width: 14%; transform: translateX(-50%);
+    background: linear-gradient(180deg, #f4d978, #c9a227 50%, #8a6a1f);
+  }
+  .gift-box-ribbon-h {
+    position: absolute; left: 0; right: 0; top: 42%; height: 14%;
+    background: linear-gradient(90deg, #f4d978, #c9a227 50%, #8a6a1f);
+  }
+  .gift-box-num {
+    position: absolute; bottom: 6px; left: 0; right: 0; text-align: center;
+    font-size: 10px; font-weight: 900; color: rgba(255,241,189,.75); letter-spacing: .08em;
+  }
+
+  .gift-box-lid {
+    position: absolute; left: 6%; right: 6%; top: 8%; height: 38%;
+    z-index: 5;
+  }
+  .gift-box-lid-top {
+    position: absolute; inset: 0;
+    border-radius: 8px 8px 4px 4px;
+    background: linear-gradient(160deg, #e74c3c 0%, #b71c1c 55%, #7a1212 100%);
+    border: 2px solid #f1d77a;
+    box-shadow: 0 4px 10px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.25);
+  }
+  .gift-box-lid-top::after {
+    content: ""; position: absolute; left: 0; right: 0; top: 48%; height: 16%;
+    background: linear-gradient(90deg, #f4d978, #c9a227 50%, #8a6a1f);
+  }
+  .gift-box-lid-front {
+    position: absolute; left: 2%; right: 2%; bottom: -7px; height: 11px;
+    background: linear-gradient(180deg, #9b1c1c, #5c1010);
+    border-radius: 0 0 4px 4px; border: 1px solid rgba(241,215,122,.4); border-top: 0;
+  }
+  .gift-box-bow {
+    position: absolute; top: -16px; left: 50%; transform: translateX(-50%);
+    font-size: 24px; filter: drop-shadow(0 2px 3px rgba(0,0,0,.45));
+    z-index: 6; line-height: 1; pointer-events: none;
+  }
+
+  .gift-box-prize {
+    position: absolute; left: 50%; top: 48%;
+    transform: translate(-50%, -50%) scale(0.35);
+    opacity: 0; z-index: 3;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    pointer-events: none;
+  }
+  .gift-box-prize-emoji { font-size: 2rem; line-height: 1; filter: drop-shadow(0 4px 8px rgba(0,0,0,.5)); }
+  .gift-box-prize-label {
+    font-size: 10px; font-weight: 900; letter-spacing: .06em;
+    color: #f4d978; text-shadow: 0 1px 2px rgba(0,0,0,.6);
+  }
+  .gift-box-caption {
+    font-size: 10px; font-weight: 800; letter-spacing: .1em; color: #a99f8c;
+  }
+
+  /* botão desabilitado não pode escurecer a caixa durante a animação */
+  .gift-box-wrap:disabled { opacity: 1 !important; cursor: default; }
+
+  /* === Abertura (1.5s, toca uma única vez) ===
+     1) tampa abre pra esquerda e some
+     2) corpo desce e some
+     3) ícone (escondido dentro da caixa) cresce */
+  @keyframes giftLidLeftFade {
+    0%   { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+    20%  { transform: translate(-6px, -10px) rotate(-14deg); opacity: 1; }
+    60%  { transform: translate(-48px, -22px) rotate(-38deg); opacity: .6; }
+    100% { transform: translate(-90px, -30px) rotate(-55deg); opacity: 0; }
+  }
+  @keyframes giftBowLeftFade {
+    0%   { opacity: 1; transform: translateX(-50%) translate(0, 0) scale(1); }
+    100% { opacity: 0; transform: translateX(-50%) translate(-56px, -20px) scale(.7); }
+  }
+  @keyframes giftBodyDownFade {
+    0%, 30% { transform: translateY(0); opacity: 1; }
+    100%    { transform: translateY(64px); opacity: 0; }
+  }
+  @keyframes giftPrizeOutGrow {
+    0%, 35% { opacity: 0; transform: translate(-50%, -50%) scale(.35); }
+    45%     { opacity: 1; transform: translate(-50%, -52%) scale(.5); }
+    100%    { opacity: 1; transform: translate(-50%, -88%) scale(1.85); }
+  }
+
+  .gift-box-wrap.opening .gift-box-lid,
+  .gift-box-wrap.opening .gift-box-body,
+  .gift-box-wrap.opening .gift-box-bow,
+  .gift-box-wrap.opening .gift-box-prize { will-change: transform, opacity; animation-iteration-count: 1; animation-fill-mode: both; }
+  .gift-box-wrap.opening .gift-box-lid  { animation-name: giftLidLeftFade;  animation-duration: 1.5s; animation-timing-function: cubic-bezier(.3,.6,.3,1); }
+  .gift-box-wrap.opening .gift-box-bow  { animation-name: giftBowLeftFade;  animation-duration: 1s;   animation-timing-function: ease-out; }
+  .gift-box-wrap.opening .gift-box-body { animation-name: giftBodyDownFade; animation-duration: 1.5s; animation-timing-function: cubic-bezier(.45,.05,.55,.95); }
+  /* o ícone fica atrás do corpo até o corpo descer */
+  .gift-box-wrap.opening .gift-box-prize { z-index: 1; animation-name: giftPrizeOutGrow; animation-duration: 1.5s; animation-timing-function: cubic-bezier(.22,.9,.3,1); }
+
+  .gift-box-wrap.opened .gift-box-lid,
+  .gift-box-wrap.opened .gift-box-body,
+  .gift-box-wrap.opened .gift-box-bow {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .gift-box-wrap.opened .gift-box-lid {
+    transform: translate(-90px, -30px) rotate(-55deg);
+  }
+  .gift-box-wrap.opened .gift-box-body {
+    transform: translateY(64px);
+  }
+  .gift-box-wrap.opened .gift-box-prize {
+    opacity: 1;
+    transform: translate(-50%, -88%) scale(1.85);
+  }
+
+  .gift-box-wrap.is-win .gift-box-prize-emoji {
+    filter: drop-shadow(0 0 14px rgba(244,217,120,.8));
+  }
+  .gift-box-wrap.is-win .gift-box-stage {
+    filter: drop-shadow(0 0 18px rgba(212,175,55,.4));
+  }
+  .gift-box-wrap.is-loss .gift-box-prize-emoji { filter: grayscale(.2) opacity(.9); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .gift-box-wrap.opening .gift-box-lid,
+    .gift-box-wrap.opening .gift-box-body,
+    .gift-box-wrap.opening .gift-box-bow,
+    .gift-box-wrap.opening .gift-box-prize { animation-duration: .01ms !important; }
+  }
+</style>
 <style id="game-surface-fx">
   .game-surface{position:relative; isolation:isolate; padding:10px; border-radius:22px; background:
     repeating-linear-gradient(90deg,rgba(255,255,255,.018) 0 2px,transparent 2px 22px),
@@ -6142,6 +6524,54 @@ html[data-theme="light"] h1 {
     if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
   } catch (e) {}
 </script>
+
+
+<style id="scrollbar-theme">
+  /* scrollbars no tema do site (obsidian + gold) */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #8a6a1f #0a0c0a;
+  }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track {
+    background: #0a0c0a;
+    border-radius: 99px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #f1d77a 0%, #c9a227 45%, #6b5210 100%);
+    border-radius: 99px;
+    border: 2px solid #0a0c0a;
+    box-shadow: inset 0 1px 0 rgba(255,241,189,.35);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #fff1bd 0%, #d4af37 50%, #8a6a1f 100%);
+  }
+  ::-webkit-scrollbar-corner { background: #0a0c0a; }
+  .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: #0a0c0a !important;
+    border-radius: 99px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #f1d77a, #c9a227 50%, #6b5210) !important;
+    border-radius: 99px !important;
+    border: 1px solid #0a0c0a !important;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #fff1bd, #d4af37) !important;
+  }
+  html[data-theme="light"] * { scrollbar-color: #c9a227 #ebe6db; }
+  html[data-theme="light"] ::-webkit-scrollbar-track { background: #ebe6db; }
+  html[data-theme="light"] ::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #e8c866, #c9a227 50%, #8a6a1f);
+    border-color: #ebe6db;
+  }
+  html[data-theme="light"] .custom-scrollbar::-webkit-scrollbar-track { background: #ebe6db !important; }
+  html[data-theme="light"] .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #e8c866, #c9a227) !important;
+    border-color: #ebe6db !important;
+  }
+</style>
 
 </body>
 </html>
