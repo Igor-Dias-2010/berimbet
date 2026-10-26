@@ -65,34 +65,30 @@
     .die-face.ivory .pip { background: radial-gradient(circle at 35% 30%, #4a3f2e, #1a1208); }
     .die-face.blue .pip, .die-face.red .pip { background: radial-gradient(circle at 35% 30%, #fff, #e8e8e8); }
     .die-face.rolling {
-      animation: diceThrow 1.55s cubic-bezier(.22,.61,.28,1) both;
+      animation: diceThrow 1.2s cubic-bezier(.22,.61,.36,1) both;
       will-change: transform;
       box-shadow: 0 8px 16px rgba(0,0,0,.28);
     }
     .die-face.rolling-delay {
-      animation-delay: 0.12s;
+      animation-delay: 0.1s;
     }
     @keyframes diceThrow {
-      0%   { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
-      8%   { transform: translate(-6px, -28px) rotate(-40deg) scale(1.06); }
-      18%  { transform: translate(14px, -62px) rotate(95deg) scale(1.1); }
-      32%  { transform: translate(-16px, -88px) rotate(-155deg) scale(1.08); }
-      46%  { transform: translate(12px, -48px) rotate(240deg) scale(1.04); }
-      58%  { transform: translate(-8px, -12px) rotate(310deg) scale(0.98); }
-      68%  { transform: translate(4px, 6px) rotate(350deg) scale(0.94); }
-      78%  { transform: translate(-3px, -14px) rotate(375deg) scale(1.03); }
-      88%  { transform: translate(2px, 2px) rotate(390deg) scale(0.98); }
-      95%  { transform: translate(0, -4px) rotate(395deg) scale(1.01); }
-      100% { transform: translate(0, 0) rotate(400deg) scale(1); }
+      0%   { transform: translate(0, 0) rotate(0deg) scale(1); }
+      15%  { transform: translate(-8px, -42px) rotate(-90deg) scale(1.08); }
+      30%  { transform: translate(12px, -70px) rotate(180deg) scale(1.12); }
+      45%  { transform: translate(-10px, -55px) rotate(300deg) scale(1.06); }
+      60%  { transform: translate(6px, -18px) rotate(400deg) scale(0.98); }
+      75%  { transform: translate(-3px, 4px) rotate(480deg) scale(0.94); }
+      88%  { transform: translate(2px, -6px) rotate(530deg) scale(1.02); }
+      100% { transform: translate(0, 0) rotate(540deg) scale(1); }
     }
     .die-face.land {
-      animation: diceLand 0.55s cubic-bezier(.2,.8,.3,1) both;
+      animation: diceLand 0.45s cubic-bezier(.2,.85,.3,1) both;
     }
     @keyframes diceLand {
-      0%   { transform: scale(1.06) rotate(-6deg); }
-      35%  { transform: scale(0.95) rotate(3deg); }
-      60%  { transform: scale(1.02) rotate(-1.5deg); }
-      80%  { transform: scale(0.99) rotate(0.6deg); }
+      0%   { transform: scale(1.08) rotate(-4deg); }
+      40%  { transform: scale(0.96) rotate(2deg); }
+      70%  { transform: scale(1.02) rotate(-1deg); }
       100% { transform: scale(1) rotate(0deg); }
     }
     .die-face.numeric {
@@ -662,8 +658,21 @@
     }
     .crash-explosion { animation: crashExplosion .55s cubic-bezier(.2,.9,.3,1) both; }
     @keyframes crashExplosion { 0%{transform:scale(.35);opacity:0} 55%{transform:scale(1.18);opacity:1} 100%{transform:scale(1);opacity:1} }
-    .bet-card { position:relative; width:64px; height:92px; border-radius:10px; background:linear-gradient(145deg,#fffdf6,#ece7d8); color:#16130d; border:1px solid #b6a982; box-shadow:0 7px 15px rgba(0,0,0,.38), inset 0 0 0 2px rgba(255,255,255,.7); transform-origin:50% 0; transition:transform .32s cubic-bezier(.2,.8,.25,1), opacity .25s ease; }
+    .bet-card { position:relative; width:64px; height:92px; border-radius:10px; background:linear-gradient(145deg,#fffdf6,#ece7d8); color:#16130d; border:1px solid #b6a982; box-shadow:0 7px 15px rgba(0,0,0,.38), inset 0 0 0 2px rgba(255,255,255,.7); transform-origin:50% 0; transition:transform .32s cubic-bezier(.2,.8,.25,1), opacity .25s ease; flex-shrink:0; }
     .bet-card.lg { width:76px; height:108px; }
+    @media (max-width:640px) {
+      .bet-card { width:44px; height:64px; border-radius:7px; }
+      .bet-card.lg { width:52px; height:74px; }
+      .bet-card .absolute.top-2 { top:4px !important; left:4px !important; font-size:10px !important; }
+      .bet-card .absolute.bottom-2 { bottom:4px !important; right:4px !important; font-size:10px !important; }
+      .bet-card .text-3xl { font-size:1.15rem !important; }
+      .bet-card.card-back::after { font-size:16px; inset:5px; }
+    }
+    @media (max-width:400px) {
+      .bet-card { width:38px; height:56px; border-radius:6px; }
+      .bet-card.lg { width:44px; height:64px; }
+      .bet-card .text-3xl { font-size:1rem !important; }
+    }
     .bet-card.deal-in { animation: cardDealIn .48s cubic-bezier(.18,.8,.24,1) both; }
     .bet-card.flip-in { animation: cardFlipIn .52s cubic-bezier(.18,.8,.24,1) both; }
     .safe-symbol-pop { animation: safeSymbolPop .34s cubic-bezier(.18,.85,.25,1) both; }
@@ -1882,7 +1891,6 @@ hr{
       { id: 'overunder', name: 'Over/Under Extreme', category: 'Dados', icon: '📊', risk: 'Alto', desc: 'Aposte se a soma de 3 dados fica acima ou abaixo de 10.5.', help: 'Como jogar:\n• Escolha OVER (>10.5) ou UNDER (<10.5).\n• 3 dados são rolados.\n• Acertou = 1.9x.' },
 
       // === CARTAS ===
-      { id: 'war', name: 'War', category: 'Cartas', icon: '🗡️', risk: 'Médio', desc: 'Uma carta sua vs uma da casa. Maior valor vence. Empate = guerra!', help: 'Como jogar:\n• Aposte e vire a carta.\n• Maior carta ganha 1.9x.\n• Empate: guerra (mais 2 cartas, maior vence 3x).' },
       { id: 'highlow', name: 'High-Low', category: 'Cartas', icon: '↕️', risk: 'Médio', desc: 'A próxima carta será maior ou menor? Acerte a sequência e multiplique.', help: 'Como jogar:\n• Veja a carta atual.\n• Escolha MAIOR ou MENOR.\n• Acerte para continuar e aumentar o multiplicador. Errou = perde.' },
       { id: 'pokerflash', name: 'Poker', category: 'Cartas', icon: '♠️', risk: 'Alto', desc: 'Five Card Draw contra a casa: receba 5 cartas, escolha quais trocar e vença no showdown.', help: 'Como jogar:\n• Aposte e receba 5 cartas (a casa também).\n• Toque nas cartas que quer trocar e confirme, ou desista.\n• A casa troca as dela e as mãos são reveladas.\n• Vence a melhor mão: 2x (3x com trinca/sequência/flush, 5x com full house ou melhor).' },
 
@@ -1894,7 +1902,6 @@ hr{
 
       // === SLOTS ===
       { id: 'fruitslots', name: 'Fruit Slots', category: 'Slots', icon: '🍒', risk: 'Médio', desc: 'Slots clássico de frutas com wild e linhas extras.', help: 'Como jogar:\n• Aposte e gire.\n• 3 iguais no centro pagam.\n• 7️⃣ = 40x, 💎 = 15x, frutas = 4x. 2 iguais = 0.5x.' },
-      { id: 'diamondrush', name: 'Diamond Rush', category: 'Slots', icon: '💎', risk: 'Alto', desc: 'Procure os diamantes. Mais diamantes = maior multiplicador.', help: 'Como jogar:\n• Gire os 3 rolos.\n• Cada 💎 aumenta o multiplicador.\n• 3 💎 = 25x. Combinações mistas também pagam.' },
 
       // === FÍSICA ===
       { id: 'bounce', name: 'Ball Bounce', category: 'Física', icon: '⚽', risk: 'Médio', desc: 'A bola quica nos obstáculos. Para onde ela cai define o prêmio.', help: 'Como jogar:\n• Aposte e solte a bola.\n• Ela quica e cai em um multiplicador.\n• Pontas pagam mais.' },
@@ -2280,19 +2287,26 @@ hr{
             h.id === betId ? { ...h, status: finalWin > 0 && (!refunded || marketEffectUsed === 'win') ? 'win' : 'loss', won: finalWin, result: finalDetails, balanceAfter: finalBal } : h
           ));
           
-          if (marketEffectUsed === 'retry' || marketEffectUsed === 'shield') {
-            showNotification(marketEffectUsed === 'retry' ? '🛡️ Passe de Revanche ativado: sua aposta foi devolvida para tentar novamente.' : '🛡️ Escudo ativado: metade da aposta foi devolvida.', 'success');
-          } else if (finalWin > 0 && (!refunded || marketEffectUsed === 'win')) {
-            showNotification(`🎉 Ganho fictício: ${formatMoney(finalWin)}!`, 'success');
-            if (hackSettings.effectsEnabled) playSoundEffect('win', hackSettings.sfxVolume);
-            triggerResultAnim('win', `+ ${formatMoney(finalWin)}`, finalWin);
-          } else if (offerDefeat) {
-            if (hackSettings.effectsEnabled) playSoundEffect('loss', hackSettings.sfxVolume);
-          } else {
-            showNotification(`💥 Você perdeu esta rodada.`, 'error');
-            if (hackSettings.effectsEnabled) playSoundEffect('loss', hackSettings.sfxVolume);
-            triggerResultAnim('loss', 'PERDEU', 0);
-          }
+          // Revela vitória/perda após 1s (todos os jogos passam por settleBet)
+          const revealWin = finalWin > 0 && (!refunded || marketEffectUsed === 'win');
+          const revealRetry = marketEffectUsed === 'retry' || marketEffectUsed === 'shield';
+          const revealDefeat = offerDefeat;
+          setTimeout(() => {
+            if (revealRetry) {
+              showNotification(marketEffectUsed === 'retry' ? '🛡️ Passe de Revanche ativado: sua aposta foi devolvida para tentar novamente.' : '🛡️ Escudo ativado: metade da aposta foi devolvida.', 'success');
+            } else if (revealWin) {
+              showNotification(`🎉 Ganho fictício: ${formatMoney(finalWin)}!`, 'success');
+              if (hackSettings.effectsEnabled) playSoundEffect('win', hackSettings.sfxVolume);
+              triggerResultAnim('win', `+ ${formatMoney(finalWin)}`, finalWin);
+            } else if (revealDefeat) {
+              if (hackSettings.effectsEnabled) playSoundEffect('loss', hackSettings.sfxVolume);
+              setDefeatCtx({ betId, stake: stakeForEffect, delta: hackSettings.frozenBalance ? 0 : finalWin, details: finalDetails, canResume: typeof reviveRegistry.current[betId] === 'function', key: Date.now() });
+            } else {
+              showNotification(`💥 Você perdeu esta rodada.`, 'error');
+              if (hackSettings.effectsEnabled) playSoundEffect('loss', hackSettings.sfxVolume);
+              triggerResultAnim('loss', 'PERDEU', 0);
+            }
+          }, 1000);
           return finalBal;
         });
 
@@ -2300,10 +2314,6 @@ hr{
           roundState: 'idle', lastResult: finalDetails,
           lastEvent: `Rodada finalizada: ${finalWin > 0 ? 'Ganho ' + formatMoney(finalWin) : 'Perda'}`
         });
-
-        if (offerDefeat) {
-          setDefeatCtx({ betId, stake: stakeForEffect, delta: hackSettings.frozenBalance ? 0 : finalWin, details: finalDetails, canResume: typeof reviveRegistry.current[betId] === 'function', key: Date.now() });
-        }
 
         if (hackSettings.nextOutcome !== 'normal') {
           setHackSettings(prev => ({ ...prev, nextOutcome: 'normal' }));
@@ -2495,6 +2505,10 @@ hr{
               })
             }
           </div>
+          <div className="mt-8 pt-4 border-t border-amber-500/20 space-y-2 text-[11px] leading-relaxed text-slate-500 relative z-50 pointer-events-auto">
+            <div>créditos: <a href="https://github.com/Igor-Dias-2010" target="_blank" rel="noopener noreferrer" onClick={(e) => { e.stopPropagation(); window.open('https://github.com/Igor-Dias-2010', '_blank', 'noopener,noreferrer'); }} className="text-amber-400 hover:text-amber-200 underline underline-offset-2 cursor-pointer pointer-events-auto">Igor-Dias-2010</a></div>
+            <div>repositório: <a href="https://github.com/Igor-Dias-2010/berimbet" target="_blank" rel="noopener noreferrer" onClick={(e) => { e.stopPropagation(); window.open('https://github.com/Igor-Dias-2010/berimbet', '_blank', 'noopener,noreferrer'); }} className="text-amber-400 hover:text-amber-200 underline underline-offset-2 cursor-pointer pointer-events-auto">BerimBET</a></div>
+          </div>
         </aside>
         </>
       );
@@ -2522,7 +2536,7 @@ hr{
             {!inGame && <button onClick={toggleSidebar} aria-label={sidebarHidden ? "Abrir barra lateral" : "Fechar barra lateral"} title={sidebarHidden ? "Abrir barra lateral" : "Fechar barra lateral"} className="hidden md:flex text-slate-300 hover:text-white p-2 rounded-lg bg-slate-800/70 border border-slate-700 transition-all shrink-0">
               <Icon path={sidebarHidden ? Icons.Menu : Icons.ChevronLeft} className="w-5 h-5" />
             </button>}
-            <button onClick={() => setView('profile')} className="flex items-center gap-2 min-w-0 rounded-full pl-0.5 pr-2 py-0.5 hover:bg-slate-800/80 transition-colors" title="Abrir perfil">
+            <button onClick={() => setView('profile')} className="flex items-center gap-2 min-w-0 rounded-full pl-0.5 pr-2.5 py-0.5 bg-slate-950/90 border border-amber-500/35 shadow-inner hover:bg-slate-800 hover:border-amber-400/55 transition-colors" title="Abrir perfil">
               <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full overflow-hidden border border-amber-400/50 bg-slate-800 flex items-center justify-center shrink-0">
                 {profileAvatar ? <img src={profileAvatar} alt="" className="w-full h-full object-cover" /> : <Icon path={Icons.User} className="w-4 h-4 text-amber-400" />}
               </div>
@@ -3947,30 +3961,30 @@ hr{
       };
 
       return (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center max-w-xl mx-auto space-y-6">
-          <h3 className="font-bold text-white text-xl">🎴 Baccarat</h3>
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-6 text-center max-w-xl mx-auto space-y-4 sm:space-y-6 overflow-x-hidden">
+          <h3 className="font-bold text-white text-lg sm:text-xl">🎴 Baccarat</h3>
           
-          <div className="flex justify-around items-start bg-slate-950 p-6 rounded-xl border border-slate-800 min-h-[200px]">
-             <div className="flex flex-col items-center gap-2">
-               <div className="text-blue-400 font-bold mb-2">JOGADOR ({gameState === 'result' ? calcBaccarat(playerHand) : '?'})</div>
-               <div className="flex gap-1">{playerHand.map((c,i)=><BetCard key={i} card={c} index={i} />)}</div>
+          <div className="flex flex-col sm:flex-row justify-around items-center sm:items-start gap-3 sm:gap-2 bg-slate-950 p-3 sm:p-6 rounded-xl border border-slate-800 min-h-0 sm:min-h-[200px]">
+             <div className="flex flex-col items-center gap-1 sm:gap-2 w-full sm:w-auto">
+               <div className="text-blue-400 font-bold text-xs sm:text-sm mb-1 sm:mb-2">JOGADOR ({gameState === 'result' ? calcBaccarat(playerHand) : '?'})</div>
+               <div className="flex gap-0.5 sm:gap-1 justify-center flex-wrap">{playerHand.map((c,i)=><BetCard key={i} card={c} index={i} />)}</div>
              </div>
-             <div className="text-2xl font-bold text-slate-600 mt-8">VS</div>
-             <div className="flex flex-col items-center gap-2">
-               <div className="text-red-400 font-bold mb-2">BANCA ({gameState === 'result' ? calcBaccarat(bankerHand) : '?'})</div>
-               <div className="flex gap-1">{bankerHand.map((c,i)=><BetCard key={i} card={c} index={i} />)}</div>
+             <div className="text-lg sm:text-2xl font-bold text-slate-600 sm:mt-8 shrink-0">VS</div>
+             <div className="flex flex-col items-center gap-1 sm:gap-2 w-full sm:w-auto">
+               <div className="text-red-400 font-bold text-xs sm:text-sm mb-1 sm:mb-2">BANCA ({gameState === 'result' ? calcBaccarat(bankerHand) : '?'})</div>
+               <div className="flex gap-0.5 sm:gap-1 justify-center flex-wrap">{bankerHand.map((c,i)=><BetCard key={i} card={c} index={i} />)}</div>
              </div>
           </div>
 
-          <div className="flex gap-2 justify-center">
-            <button onClick={()=>setBetChoice('player')} className={cn("px-4 py-2 rounded font-bold border", betChoice==='player' ? "bg-blue-600 text-white border-blue-400" : "bg-slate-800 text-slate-400 border-slate-700")}>JOGADOR (1:1)</button>
-            <button onClick={()=>setBetChoice('tie')} className={cn("px-4 py-2 rounded font-bold border", betChoice==='tie' ? "bg-amber-600 text-white border-amber-400" : "bg-slate-800 text-slate-400 border-slate-700")}>EMPATE (8:1)</button>
-            <button onClick={()=>setBetChoice('banker')} className={cn("px-4 py-2 rounded font-bold border", betChoice==='banker' ? "bg-red-600 text-white border-red-400" : "bg-slate-800 text-slate-400 border-slate-700")}>BANCA (0.95:1)</button>
+          <div className="flex flex-wrap gap-2 justify-center">
+            <button onClick={()=>setBetChoice('player')} className={cn("px-3 sm:px-4 py-2 rounded font-bold border text-xs sm:text-sm", betChoice==='player' ? "bg-blue-600 text-white border-blue-400" : "bg-slate-800 text-slate-400 border-slate-700")}>JOGADOR (1:1)</button>
+            <button onClick={()=>setBetChoice('tie')} className={cn("px-3 sm:px-4 py-2 rounded font-bold border text-xs sm:text-sm", betChoice==='tie' ? "bg-amber-600 text-white border-amber-400" : "bg-slate-800 text-slate-400 border-slate-700")}>EMPATE (8:1)</button>
+            <button onClick={()=>setBetChoice('banker')} className={cn("px-3 sm:px-4 py-2 rounded font-bold border text-xs sm:text-sm", betChoice==='banker' ? "bg-red-600 text-white border-red-400" : "bg-slate-800 text-slate-400 border-slate-700")}>BANCA (0.95:1)</button>
           </div>
 
           <div className="flex gap-2 flex-wrap items-center justify-center">
-            <input type="number" min="1" value={betAmount} onChange={e => setBetAmount(Number(e.target.value))} disabled={gameState==='dealing'} className="bg-slate-950 border border-slate-800 p-3 text-center rounded-lg text-white w-32" /><QuickBet value={betAmount} onChange={setBetAmount} disabled={gameState==='dealing'} />
-            <button onClick={deal} disabled={gameState==='dealing'} className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-8 py-3 rounded-lg flex-1 disabled:opacity-50">JOGAR BACCARAT</button>
+            <input type="number" min="1" value={betAmount} onChange={e => setBetAmount(Number(e.target.value))} disabled={gameState==='dealing'} className="bg-slate-950 border border-slate-800 p-3 text-center rounded-lg text-white w-28 sm:w-32" /><QuickBet value={betAmount} onChange={setBetAmount} disabled={gameState==='dealing'} />
+            <button onClick={deal} disabled={gameState==='dealing'} className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-6 sm:px-8 py-3 rounded-lg flex-1 min-w-[140px] disabled:opacity-50">JOGAR BACCARAT</button>
           </div>
         </div>
       );
@@ -4541,8 +4555,10 @@ hr{
           setSt('done');
           setBalance(b => Math.round((b + prize) * 100) / 100);
           { const now = new Date(); setHistory(h => [{ id: Math.random().toString(36).substr(2, 9), ts: now.getTime(), date: now.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }), game: 'Tiro na Garrafa', type: 'bet', amount: 0, details: 'Jogo grátis (sem aposta)', status: prize > 0 ? 'win' : 'loss', won: prize, result: `Ganhou ${formatMoney(prize)} (limite ${formatMoney(FREE_CAP)})`, balanceAfter: balance + prize }, ...h].slice(0, 100)); }
-          sfx(hackSettings, prize > 0 ? 'win' : 'tie');
-          showNotification(prize > 0 ? `Você ganhou ${formatMoney(prize)} de graça!` : 'Nenhum acerto desta vez. Tente de novo!', prize > 0 ? 'success' : 'info');
+          setTimeout(() => {
+            sfx(hackSettings, prize > 0 ? 'win' : 'tie');
+            showNotification(prize > 0 ? `Você ganhou ${formatMoney(prize)} de graça!` : 'Nenhum acerto desta vez. Tente de novo!', prize > 0 ? 'success' : 'info');
+          }, 1000);
         }
       }, [shots, bottles, st]);
 
@@ -4551,8 +4567,11 @@ hr{
         if (st !== 'playing' || shots <= 0) return;
         setShots(s => s - 1);
         if (b && !b.hit) {
-          setBottles(bs => bs.map(x => x.id === b.id ? { ...x, hit: true } : x));
+          setBottles(bs => bs.map(x => x.id === b.id ? { ...x, hit: true, showPrize: true } : x));
           setWon(w => w + b.val * FREE_UNIT); sfx(hackSettings, 'ball_stop');
+          setTimeout(() => {
+            setBottles(bs => bs.map(x => x.id === b.id ? { ...x, showPrize: false } : x));
+          }, 1000);
         } else sfx(hackSettings, 'flip');
       };
       return (
@@ -4566,7 +4585,7 @@ hr{
             <div className="absolute bottom-6 left-0 right-0 h-2 bg-amber-900" />
             {bottles.map(b => (
               <button key={b.id} onClick={e => { e.stopPropagation(); shoot(b); }} className="absolute bottom-8 text-4xl select-none" style={{ left: `${b.x}%` }}>
-                {b.hit ? <span className="text-sm font-black text-amber-300 block animate-bounce">+{formatMoney(b.val * FREE_UNIT)}</span> : '🍾'}
+                {!b.hit ? '🍾' : (b.showPrize ? <span className="text-sm font-black text-amber-300 block animate-bounce">+{formatMoney(b.val * FREE_UNIT)}</span> : null)}
               </button>
             ))}
             {st === 'idle' && <div className="absolute inset-0 bg-slate-950/70 flex items-center justify-center text-slate-400 text-sm px-6">{eligible ? 'Clique em COMEÇAR e acerte as garrafas em movimento!' : `🔒 Disponível apenas com saldo abaixo de ${formatMoney(FREE_LIMIT)}.`}</div>}
@@ -4921,45 +4940,6 @@ hr{
     };
 
     // --- WAR ---
-    const GameWar = () => {
-      const { placeBet, settleBet, hackSettings } = useAppState();
-      const [bet, setBet] = useState(10);
-      const [st, setSt] = useState('idle');
-      const [pCard, setPCard] = useState(null);
-      const [hCard, setHCard] = useState(null);
-      const ranks = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
-      const val = r => ranks.indexOf(r);
-      const play = () => {
-        const id = placeBet(bet, 'Guerra (War)', `Aposta ${formatMoney(bet)}`);
-        if (!id) return;
-        setSt('dealing'); sfx(hackSettings, 'card');
-        setTimeout(() => {
-          let pr = ranks[Math.floor(Math.random()*13)];
-          let hr = ranks[Math.floor(Math.random()*13)];
-          if (hackSettings.nextOutcome === 'win') { pr = 'A'; hr = '5'; }
-          if (hackSettings.nextOutcome === 'loss') { pr = '3'; hr = 'K'; }
-          setPCard(pr); setHCard(hr); setSt('result');
-          const pv = val(pr), hv = val(hr);
-          let win = 0, msg = '';
-          if (pv > hv) { win = bet * 1.9; msg = 'Você venceu!'; }
-          else if (pv < hv) { win = 0; msg = 'Casa venceu'; }
-          else { win = bet * 3; msg = 'GUERRA! Empate → 3x'; }
-          settleBet(id, win, `${msg} (${pr} vs ${hr})`);
-        }, 700);
-      };
-      return (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center max-w-xl mx-auto space-y-5">
-          <div className="flex justify-around bg-slate-950 p-6 rounded-xl border border-slate-800">
-            <BetCard card={{rank:pCard || '?', suit:'♠'}} index={0} size="lg" />
-            <div className="text-2xl font-bold text-slate-600 self-center">VS</div>
-            <BetCard card={{rank:hCard || '?', suit:'♥'}} index={1} size="lg" />
-          </div>
-          <BetInput value={bet} onChange={setBet} disabled={st==='dealing'} />
-          <button onClick={play} disabled={st==='dealing'} className="w-full bg-red-500 hover:bg-red-400 text-white font-black py-3 rounded-lg disabled:opacity-50">VIRAR CARTAS</button>
-        </div>
-      );
-    };
-
     // --- HIGH-LOW ---
     const GameHighLow = () => {
       const { placeBet, settleBet, hackSettings, registerRevive } = useAppState();
@@ -7964,7 +7944,7 @@ hr{
           <div className="p-4 sm:p-6 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3"><div><div className="text-white font-black">{marketPurchases.length} unidade(s) no inventário</div><p className="text-xs text-slate-400 mt-1">Utilizáveis: {countKind('usable')} · Colecionáveis: {countKind('collectible')}</p></div>{marketPurchases.length > 0 && <button onClick={() => { if (!window.confirm('Limpar todo o inventário? Não haverá reembolso e os efeitos já ativados não serão cancelados.')) return; setMarketPurchases([]); showNotification('Inventário limpo. As fichas e o saldo gastos não foram devolvidos.', 'success'); }} className="market-clear-btn rounded-lg px-3 py-2 text-xs sm:text-sm font-bold w-full sm:w-auto">Limpar inventário</button>}</div>
             <div className="market-tabs flex flex-wrap gap-2" role="tablist" aria-label="Categorias do inventário"><button role="tab" aria-selected={inventoryTab === 'usable'} onClick={() => setInventoryTab('usable')} className={`market-tab-btn rounded-lg px-4 py-3 text-sm font-black ${inventoryTab === 'usable' ? 'active' : ''}`}>⚡ Utilizáveis ({countKind('usable')})</button><button role="tab" aria-selected={inventoryTab === 'collectible'} onClick={() => setInventoryTab('collectible')} className={`market-tab-btn rounded-lg px-4 py-3 text-sm font-black ${inventoryTab === 'collectible' ? 'active' : ''}`}>🌌 Colecionáveis ({countKind('collectible')})</button></div>
-            {groups.length === 0 ? <div className="inventory-empty rounded-xl p-8 text-center"><div className="text-4xl mb-3">🎒</div><h3 className="font-black text-white">Nenhum {inventoryTab === 'usable' ? 'item utilizável' : 'colecionável'} aqui</h3><p className="text-sm text-slate-400 mt-2">Acesse o mercado para adquirir novos itens.</p><button onClick={() => setView('lobby')} className="market-buy-btn rounded-lg px-4 py-2 mt-4 text-sm font-black">Ir ao mercado</button></div> : <div className="grid grid-cols-1 md:grid-cols-2 gap-3">{groups.map(({definition, items, count, first, latest}) => {
+            {groups.length === 0 ? <div className="inventory-empty rounded-xl p-8 text-center"><div className="text-4xl mb-3">🎒</div><h3 className="font-black text-white">Nenhum {inventoryTab === 'usable' ? 'item utilizável' : 'colecionável'} aqui</h3><p className="text-sm text-slate-400 mt-2">Acesse o mercado para adquirir novos itens.</p><button onClick={() => setView('market')} className="market-buy-btn rounded-lg px-4 py-2 mt-4 text-sm font-black">Ir ao mercado</button></div> : <div className="grid grid-cols-1 md:grid-cols-2 gap-3">{groups.map(({definition, items, count, first, latest}) => {
               const effectType = definition.effectType || '';
               const acquiredPrice = Number(first.chipPrice ?? definition.chipPrice ?? 0);
               return <article key={definition.id} className="market-inventory-card rounded-xl p-4 flex flex-col gap-3"><div className="flex items-start gap-3 min-w-0"><div className="market-prize-icon rounded-xl w-14 h-14 flex items-center justify-center text-3xl shrink-0">{definition.icon}</div><div className="min-w-0 flex-1"><h3 className="font-black text-white break-words">{definition.name}</h3><span className="inline-block mt-1 text-[10px] uppercase tracking-wider font-black rounded-full px-2 py-1 border border-amber-500/25 text-amber-300">{definition.kind === 'usable' ? 'Utilizável' : 'Colecionável'}</span><div className="text-sm font-black text-emerald-300 mt-2">{count}X</div></div></div><p className="text-sm text-slate-300 leading-relaxed">{definition.desc}</p>
@@ -8061,7 +8041,6 @@ hr{
                  {(activeGame.engine || activeGame.id) === 'parouimpar' && <GameParOuImpar />}
                  {(activeGame.engine || activeGame.id) === 'diceduel' && <GameDiceDuel />}
                  {(activeGame.engine || activeGame.id) === 'overunder' && <GameOverUnder />}
-                 {(activeGame.engine || activeGame.id) === 'war' && <GameWar />}
                  {(activeGame.engine || activeGame.id) === 'highlow' && <GameHighLow />}
                  {(activeGame.engine || activeGame.id) === 'pokerflash' && <GamePokerFlash />}
                  {(activeGame.engine || activeGame.id) === 'wheel' && <GameWheel />}
@@ -8069,7 +8048,6 @@ hr{
                  {(activeGame.engine || activeGame.id) === 'giftboxes' && <GameGiftBoxes />}
                  {(activeGame.engine || activeGame.id) === 'keno' && <GameKeno />}
                  {(activeGame.engine || activeGame.id) === 'fruitslots' && <GameFruitSlots />}
-                 {(activeGame.engine || activeGame.id) === 'diamondrush' && <GameDiamondRush />}
                  {(activeGame.engine || activeGame.id) === 'bounce' && <GameBounce />}
                  {(activeGame.engine || activeGame.id) === 'gravity' && <GameGravity />}
                  {(activeGame.engine || activeGame.id) === 'tictactoe' && <GameTicTacToe />}
