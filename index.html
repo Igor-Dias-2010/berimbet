@@ -7286,12 +7286,12 @@ hr{
       if (!isOpen) return null;
 
       const login = () => { 
-        if (pwd === '2112') { 
+        if (pwd === '6742') { 
           setIsAdminAuth(true); 
           setPwd(''); 
           showNotification("Acesso concedido ao HACK MODE!", "success");
         } else {
-          showNotification("Senha incorreta! Use 2112.", "error"); 
+          showNotification("Senha incorreta! Use 6742.", "error"); 
         }
       };
 
@@ -7322,7 +7322,6 @@ hr{
               ) : (
                 <div className="space-y-6">
                   <div className="bg-hack-900/40 border border-hack-500/50 rounded-xl p-3 flex items-center justify-between text-xs text-hack-400 font-mono">
-                    <span>⚡ PAINEL DE CONTROLE DE SANDBOX INTERNO ATIVO</span>
                     <span className="bg-hack-500 text-slate-950 px-2 py-0.5 rounded font-bold">MODO DEV</span>
                   </div>
 
@@ -7395,7 +7394,7 @@ hr{
                       </button>
                       <button onClick={() => { try { ['simbet_balance_v5','simbet_history','simbet_favorites','simbet_diffs'].forEach(k => localStorage.removeItem(k)); } catch (e) {} setBalance(10); setHistory([]); showNotification('Saldo e dados salvos resetados (R$ 10,00)', 'info'); }} className="p-3 bg-slate-950 border border-red-900 rounded-xl text-left hover:border-red-500">
                         <span className="text-xs font-bold text-red-400 block">♻️ Resetar saldo e dados salvos</span>
-                        <span className="text-[10px] text-slate-500">Volta para R$ 100,00 e apaga o localStorage</span>
+                        <span className="text-[10px] text-slate-500">Volta para R$ 10,00 e apaga o localStorage</span>
                       </button>
                       <button onClick={() => setHistory([])} className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-left hover:border-slate-600">
                         <span className="text-xs font-bold text-slate-300 block">🧹 Limpar Histórico</span>
