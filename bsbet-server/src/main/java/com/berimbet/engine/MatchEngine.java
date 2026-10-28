@@ -6,6 +6,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiConsumer;
 
+/**
+ * Simulação calma e estável:
+ * - 20 ticks/s (leve pro servidor free-tier)
+ * - 1 envio de estado por tick (~20 Hz) — suficiente e fluido
+ * - Partida dura ~70–90 s de tempo real (ou até 2 gols)
+ * - Movimento mais lento para ser agradável de assistir
+ */
 public class MatchEngine implements Runnable {
     @Getter private final String matchId;
     @Getter private final List<Player> players = new ArrayList<>();
@@ -13,14 +20,19 @@ public class MatchEngine implements Runnable {
     @Getter private int homeScore = 0, awayScore = 0, matchMinute = 0;
 
     private int ticks = 0;
-    private int sendCounter = 0;
     private boolean isRunning = false, isGoalCelebration = false;
     private final Runnable onTickCallback, onMatchEndCallback;
     private final BiConsumer<String, MatchEngine> onEventCallback;
 
-    /** Envia estado a cada N ticks de simulação (60 Hz). 2 = ~30 updates/s na rede. */
-    private static final int SEND_EVERY_N_TICKS = 2;
-    private static final double NS_PER_TICK = 1_000_000_000.0 / 60.0;
+    /** 20 ticks por segundo — leve e estável */
+    private static final double TICKS_PER_SEC = 20.0;
+    private static final double NS_PER_TICK = 1_000_000_000.0 / TICKS_PER_SEC;
+
+    /**
+     * 1 minuto de jogo ≈ 0.9 s real → 90 min ≈ 81 s de partida.
+     * Fórmula: minute = ticks / TICKS_PER_SEC / 0.9
+     */
+    private static final double REAL_SECONDS_PER_MATCH_MINUTE = 0.9;
 
     public MatchEngine(String matchId, Runnable onTickCallback, Runnable onMatchEndCallback,
                        BiConsumer<String, MatchEngine> onEventCallback) {
@@ -59,25 +71,31 @@ public class MatchEngine implements Runnable {
     public void run() {
         long lastTime = System.nanoTime();
         double delta = 0;
+
         while (isRunning) {
             long now = System.nanoTime();
             delta += (now - lastTime) / NS_PER_TICK;
             lastTime = now;
 
-            // Processa ticks de simulação (pode catch-up se houver lag)
-            while (delta >= 1 && isRunning) {
+            // Limita catch-up: no máximo 2 ticks por frame de loop
+            // evita "explosão" de ticks após pause de GC
+            int steps = 0;
+            while (delta >= 1 && isRunning && steps < 2) {
                 tick();
                 delta--;
-                sendCounter++;
-                // Envia estado apenas a cada N ticks → reduz drasticamente serialização/GC/WebSocket
-                if (sendCounter >= SEND_EVERY_N_TICKS && onTickCallback != null) {
+                steps++;
+
+                // 1 envio por tick de simulação (~20 Hz)
+                if (onTickCallback != null) {
                     onTickCallback.run();
-                    sendCounter = 0;
                 }
             }
+            // Se acumulou demais (servidor lento), descarta o excesso
+            if (delta > 2) delta = 0;
 
             try {
-                Thread.sleep(1);
+                // ~20 Hz → sleep ~45–50 ms deixa o CPU respirar
+                Thread.sleep(45);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
@@ -89,9 +107,8 @@ public class MatchEngine implements Runnable {
         if (isGoalCelebration) return;
 
         ticks++;
-        matchMinute = Math.min(90, (int) ((ticks / 60.0) / 10.0 * 90.0));
+        matchMinute = Math.min(90, (int) (ticks / TICKS_PER_SEC / REAL_SECONDS_PER_MATCH_MINUTE));
 
-        // Calcula o jogador mais próximo uma única vez por tick (evita O(n²))
         Player closestHome = getClosestPlayerToBall(Enums.TeamSide.HOME);
         Player closestAway = getClosestPlayerToBall(Enums.TeamSide.AWAY);
 
@@ -102,6 +119,7 @@ public class MatchEngine implements Runnable {
         ball.updatePhysics();
         checkGoals();
 
+        // Termina em 90' ou quando houver 2 gols no total (partida curta e assistível)
         if (matchMinute >= 90 || (homeScore + awayScore >= 2)) {
             isRunning = false;
             if (onMatchEndCallback != null) onMatchEndCallback.run();
@@ -110,7 +128,7 @@ public class MatchEngine implements Runnable {
 
     private void checkBallCollision(Player p) {
         if (ball.getOwner() == null
-                && p.getPosition().distance(ball.getPosition()) < 2.5
+                && p.getPosition().distance(ball.getPosition()) < 2.8
                 && p.getCooldownTicks() == 0) {
             ball.setOwner(p);
         }
@@ -138,10 +156,9 @@ public class MatchEngine implements Runnable {
                 this
             );
         }
-        // Thread curta só para a celebração; não interfere no loop principal
         new Thread(() -> {
             try {
-                Thread.sleep(3000);
+                Thread.sleep(2800);
                 resetPositions();
                 isGoalCelebration = false;
             } catch (InterruptedException ignored) {
@@ -161,6 +178,7 @@ public class MatchEngine implements Runnable {
             p.getVelocity().x = 0;
             p.getVelocity().y = 0;
             p.setState(Enums.PlayerState.IDLE);
+            p.setCooldownTicks(0);
         }
     }
 
@@ -187,7 +205,7 @@ public class MatchEngine implements Runnable {
             if (p.getTeam() == passer.getTeam() && p != passer) {
                 double distToGoal = Math.abs(p.getPosition().x - targetGoalX);
                 double distToPasser = p.getPosition().distance(passer.getPosition());
-                if (distToPasser > 5 && distToPasser < 40) {
+                if (distToPasser > 6 && distToPasser < 35) {
                     double score = (100 - distToGoal) - (distToPasser * 0.5);
                     if (score > bestScore) {
                         bestScore = score;

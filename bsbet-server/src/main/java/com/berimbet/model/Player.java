@@ -13,6 +13,10 @@ public class Player {
     private PlayerAttributes attributes;
     private int cooldownTicks = 0;
 
+    /** Escala global de velocidade — deixa o jogo assistível */
+    private static final double SPEED_SCALE = 0.38;
+    private static final double ACCEL_SCALE = 0.45;
+
     public Player(int id, Enums.TeamSide team, Enums.PlayerRole role, Vector2D startPos) {
         this.id = id;
         this.team = team;
@@ -24,13 +28,12 @@ public class Player {
         this.attributes = PlayerAttributes.generateForRole(role);
     }
 
-    /**
-     * Update com closest prÃ©-calculados pelo engine (evita O(nÂ²) por tick).
-     */
     public void update(MatchEngine engine, Player closestHome, Player closestAway) {
         if (cooldownTicks > 0) {
             cooldownTicks--;
             applyFriction();
+            this.position.add(this.velocity);
+            keepInBounds();
             return;
         }
         decideState(engine, closestHome, closestAway);
@@ -61,52 +64,56 @@ public class Player {
     private void executeState(MatchEngine engine) {
         Ball ball = engine.getBall();
         double targetGoalX = (team == Enums.TeamSide.HOME) ? 100 : 0;
+        double spd = attributes.getSpeed() * SPEED_SCALE;
+
         switch (state) {
             case WITH_BALL -> {
                 double distToGoal = Math.abs(this.position.x - targetGoalX);
-                if (distToGoal < 30 && Math.random() < attributes.getShooting() * 0.05) {
+                // Chance de chute um pouco maior em distância razoável (partida mais viva)
+                if (distToGoal < 28 && Math.random() < attributes.getShooting() * 0.04) {
                     Vector2D shotDir = Vector2D.sub(
-                        new Vector2D(targetGoalX, 50 + (Math.random() * 10 - 5)),
+                        new Vector2D(targetGoalX, 50 + (Math.random() * 8 - 4)),
                         this.position
                     );
                     shotDir.normalize();
-                    shotDir.mult(2.5 + attributes.getShooting());
+                    // Força de chute reduzida
+                    shotDir.mult(1.4 + attributes.getShooting() * 0.6);
                     ball.kick(shotDir);
-                    this.cooldownTicks = 15;
+                    this.cooldownTicks = 12;
                     return;
                 }
                 Player bestTeammate = engine.findBestPassOption(this);
-                if (bestTeammate != null && Math.random() < attributes.getPassing() * 0.03) {
+                if (bestTeammate != null && Math.random() < attributes.getPassing() * 0.025) {
                     Vector2D passDir = Vector2D.sub(bestTeammate.getPosition(), this.position);
                     passDir.normalize();
-                    passDir.mult(1.8 + attributes.getPassing());
+                    passDir.mult(1.1 + attributes.getPassing() * 0.5);
                     ball.kick(passDir);
-                    this.cooldownTicks = 10;
+                    this.cooldownTicks = 8;
                     return;
                 }
-                steerTowards(new Vector2D(targetGoalX, 50), attributes.getSpeed() * 0.7);
+                steerTowards(new Vector2D(targetGoalX, 50), spd * 0.65);
             }
             case DEFENDING -> {
                 if (ball.getOwner() != null) {
-                    if (this.position.distance(ball.getOwner().getPosition()) < 3.0
-                            && Math.random() < attributes.getTackling() * 0.1) {
-                        ball.getOwner().setCooldownTicks(30);
+                    if (this.position.distance(ball.getOwner().getPosition()) < 3.2
+                            && Math.random() < attributes.getTackling() * 0.08) {
+                        ball.getOwner().setCooldownTicks(22);
                         ball.setOwner(this);
                     } else {
-                        steerTowards(ball.getPosition(), attributes.getSpeed() * 0.9);
+                        steerTowards(ball.getPosition(), spd * 0.85);
                     }
                 }
             }
             case SUPPORTING -> {
                 if (ball.getOwner() == null) {
-                    steerTowards(ball.getPosition(), attributes.getSpeed());
+                    steerTowards(ball.getPosition(), spd);
                 } else {
                     steerTowards(
                         new Vector2D(
-                            homePosition.x + (team == Enums.TeamSide.HOME ? 15 : -15),
+                            homePosition.x + (team == Enums.TeamSide.HOME ? 12 : -12),
                             homePosition.y
                         ),
-                        attributes.getSpeed() * 0.8
+                        spd * 0.7
                     );
                 }
             }
@@ -117,30 +124,30 @@ public class Player {
                             team == Enums.TeamSide.HOME ? 3 : 97,
                             Math.max(40, Math.min(60, ball.getPosition().y))
                         ),
-                        attributes.getSpeed()
+                        spd * 0.9
                     );
                 } else {
-                    steerTowards(homePosition, attributes.getSpeed() * 0.6);
+                    steerTowards(homePosition, spd * 0.5);
                 }
             }
-            default -> { /* TACKLING etc. nÃ£o usados ativamente */ }
+            default -> { }
         }
     }
 
     private void steerTowards(Vector2D target, double maxSpeed) {
         Vector2D desired = Vector2D.sub(target, this.position);
         double d = desired.mag();
-        if (d > 0) {
+        if (d > 0.4) {
             desired.normalize();
-            desired.mult(d < 5.0 ? maxSpeed * (d / 5.0) : maxSpeed);
+            desired.mult(d < 6.0 ? maxSpeed * (d / 6.0) : maxSpeed);
             Vector2D steer = Vector2D.sub(desired, this.velocity);
-            steer.limit(attributes.getAcceleration());
+            steer.limit(attributes.getAcceleration() * ACCEL_SCALE);
             this.velocity.add(steer);
         }
     }
 
     private void applyFriction() {
-        this.velocity.mult(0.90);
+        this.velocity.mult(0.88);
     }
 
     private void keepInBounds() {
