@@ -7,11 +7,10 @@ import java.util.List;
 import java.util.function.BiConsumer;
 
 /**
- * Simulação calma e estável:
- * - 20 ticks/s (leve pro servidor free-tier)
- * - 1 envio de estado por tick (~20 Hz) — suficiente e fluido
- * - Partida dura ~70–90 s de tempo real (ou até 2 gols)
- * - Movimento mais lento para ser agradável de assistir
+ * Motor 4-3-3:
+ * - 15 ticks/s de física
+ * - Envio a cada 2 ticks (~7.5 Hz) — cliente interpola → fluido e leve
+ * - Partida ~75–90 s reais (ou 2 gols)
  */
 public class MatchEngine implements Runnable {
     @Getter private final String matchId;
@@ -20,18 +19,14 @@ public class MatchEngine implements Runnable {
     @Getter private int homeScore = 0, awayScore = 0, matchMinute = 0;
 
     private int ticks = 0;
+    private int sendCounter = 0;
     private boolean isRunning = false, isGoalCelebration = false;
     private final Runnable onTickCallback, onMatchEndCallback;
     private final BiConsumer<String, MatchEngine> onEventCallback;
 
-    /** 20 ticks por segundo — leve e estável */
-    private static final double TICKS_PER_SEC = 20.0;
+    private static final double TICKS_PER_SEC = 15.0;
     private static final double NS_PER_TICK = 1_000_000_000.0 / TICKS_PER_SEC;
-
-    /**
-     * 1 minuto de jogo ≈ 0.9 s real → 90 min ≈ 81 s de partida.
-     * Fórmula: minute = ticks / TICKS_PER_SEC / 0.9
-     */
+    private static final int SEND_EVERY = 2; // ~7.5 updates/s na rede
     private static final double REAL_SECONDS_PER_MATCH_MINUTE = 0.9;
 
     public MatchEngine(String matchId, Runnable onTickCallback, Runnable onMatchEndCallback,
@@ -44,13 +39,26 @@ public class MatchEngine implements Runnable {
     }
 
     private void setupTeams() {
-        double[][] homeForm = {{7,50}, {20,20}, {20,40}, {20,60}, {20,80}, {34,25}, {34,50}, {34,75}, {46,25}, {46,50}, {46,75}};
-        double[][] awayForm = {{93,50}, {80,20}, {80,40}, {80,60}, {80,80}, {66,25}, {66,50}, {66,75}, {54,25}, {54,50}, {54,75}};
+        // Formação 4-3-3 clássica (coordenadas 0–100)
+        // HOME ataca para a direita
+        double[][] homeForm = {
+            {5, 50},   // GK
+            {18, 18}, {18, 38}, {18, 62}, {18, 82}, // DEF
+            {38, 28}, {38, 50}, {38, 72},           // MID
+            {58, 22}, {62, 50}, {58, 78}            // FWD
+        };
+        double[][] awayForm = {
+            {95, 50},
+            {82, 18}, {82, 38}, {82, 62}, {82, 82},
+            {62, 28}, {62, 50}, {62, 72},
+            {42, 22}, {38, 50}, {42, 78}
+        };
         Enums.PlayerRole[] roles = {
-            Enums.PlayerRole.GOALKEEPER, Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER,
-            Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER, Enums.PlayerRole.MIDFIELDER,
-            Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.FORWARD,
-            Enums.PlayerRole.FORWARD, Enums.PlayerRole.FORWARD
+            Enums.PlayerRole.GOALKEEPER,
+            Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER,
+            Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER,
+            Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER,
+            Enums.PlayerRole.FORWARD, Enums.PlayerRole.FORWARD, Enums.PlayerRole.FORWARD
         };
         for (int i = 0; i < 11; i++) {
             players.add(new Player(i, Enums.TeamSide.HOME, roles[i], new Vector2D(homeForm[i][0], homeForm[i][1])));
@@ -77,25 +85,21 @@ public class MatchEngine implements Runnable {
             delta += (now - lastTime) / NS_PER_TICK;
             lastTime = now;
 
-            // Limita catch-up: no máximo 2 ticks por frame de loop
-            // evita "explosão" de ticks após pause de GC
             int steps = 0;
             while (delta >= 1 && isRunning && steps < 2) {
                 tick();
                 delta--;
                 steps++;
-
-                // 1 envio por tick de simulação (~20 Hz)
-                if (onTickCallback != null) {
+                sendCounter++;
+                if (sendCounter >= SEND_EVERY && onTickCallback != null) {
                     onTickCallback.run();
+                    sendCounter = 0;
                 }
             }
-            // Se acumulou demais (servidor lento), descarta o excesso
             if (delta > 2) delta = 0;
 
             try {
-                // ~20 Hz → sleep ~45–50 ms deixa o CPU respirar
-                Thread.sleep(45);
+                Thread.sleep(55); // ~15 Hz loop, CPU leve
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
@@ -119,7 +123,6 @@ public class MatchEngine implements Runnable {
         ball.updatePhysics();
         checkGoals();
 
-        // Termina em 90' ou quando houver 2 gols no total (partida curta e assistível)
         if (matchMinute >= 90 || (homeScore + awayScore >= 2)) {
             isRunning = false;
             if (onMatchEndCallback != null) onMatchEndCallback.run();
@@ -128,7 +131,7 @@ public class MatchEngine implements Runnable {
 
     private void checkBallCollision(Player p) {
         if (ball.getOwner() == null
-                && p.getPosition().distance(ball.getPosition()) < 2.8
+                && p.getPosition().distance(ball.getPosition()) < 2.6
                 && p.getCooldownTicks() == 0) {
             ball.setOwner(p);
         }
@@ -136,11 +139,12 @@ public class MatchEngine implements Runnable {
 
     private void checkGoals() {
         Vector2D bp = ball.getPosition();
+        // Gol entre y 39–61 (trave), linha de gol em x≈1.2 / 98.8
         if (bp.y >= 39 && bp.y <= 61) {
-            if (bp.x <= 1.5) {
+            if (bp.x <= 1.2) {
                 awayScore++;
                 handleGoal(Enums.TeamSide.AWAY);
-            } else if (bp.x >= 98.5) {
+            } else if (bp.x >= 98.8) {
                 homeScore++;
                 handleGoal(Enums.TeamSide.HOME);
             }
@@ -158,7 +162,7 @@ public class MatchEngine implements Runnable {
         }
         new Thread(() -> {
             try {
-                Thread.sleep(2800);
+                Thread.sleep(2600);
                 resetPositions();
                 isGoalCelebration = false;
             } catch (InterruptedException ignored) {
@@ -186,32 +190,47 @@ public class MatchEngine implements Runnable {
         Player closest = null;
         double minDist = Double.MAX_VALUE;
         for (Player p : players) {
-            if (p.getTeam() == team && p.getRole() != Enums.PlayerRole.GOALKEEPER) {
-                double dist = p.getPosition().distance(ball.getPosition());
-                if (dist < minDist) {
-                    minDist = dist;
-                    closest = p;
-                }
+            if (p.getTeam() != team) continue;
+            if (p.getRole() == Enums.PlayerRole.GOALKEEPER) continue;
+            double dist = p.getPosition().distance(ball.getPosition());
+            if (dist < minDist) {
+                minDist = dist;
+                closest = p;
             }
         }
         return closest;
     }
 
+    /**
+     * Melhor opção de passe: prioriza companheiro mais avançado e com espaço,
+     * evitando passe para trás demais (exceto zagueiro sob pressão).
+     */
     public Player findBestPassOption(Player passer) {
         Player best = null;
         double bestScore = -Double.MAX_VALUE;
-        double targetGoalX = (passer.getTeam() == Enums.TeamSide.HOME) ? 100 : 0;
+        double attackDir = passer.getTeam() == Enums.TeamSide.HOME ? 1 : -1;
+        double goalX = passer.getTeam() == Enums.TeamSide.HOME ? 100 : 0;
+
         for (Player p : players) {
-            if (p.getTeam() == passer.getTeam() && p != passer) {
-                double distToGoal = Math.abs(p.getPosition().x - targetGoalX);
-                double distToPasser = p.getPosition().distance(passer.getPosition());
-                if (distToPasser > 6 && distToPasser < 35) {
-                    double score = (100 - distToGoal) - (distToPasser * 0.5);
-                    if (score > bestScore) {
-                        bestScore = score;
-                        best = p;
-                    }
-                }
+            if (p.getTeam() != passer.getTeam() || p == passer) continue;
+            double dist = p.getPosition().distance(passer.getPosition());
+            if (dist < 6 || dist > 38) continue;
+
+            double progress = (p.getPosition().x - passer.getPosition().x) * attackDir;
+            double distToGoal = Math.abs(p.getPosition().x - goalX);
+            // Pontuação: progresso + proximidade do gol - distância do passe
+            double score = progress * 2.2 + (100 - distToGoal) * 0.35 - dist * 0.4;
+
+            // Bônus para atacante na área
+            if (p.getRole() == Enums.PlayerRole.FORWARD && distToGoal < 25) score += 12;
+            // Meias bons para combinar
+            if (p.getRole() == Enums.PlayerRole.MIDFIELDER) score += 4;
+            // Evita devolver pro goleiro sem necessidade
+            if (p.getRole() == Enums.PlayerRole.GOALKEEPER) score -= 25;
+
+            if (score > bestScore) {
+                bestScore = score;
+                best = p;
             }
         }
         return best;

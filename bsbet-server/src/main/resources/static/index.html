@@ -8196,21 +8196,66 @@
         x: p[0], y: p[1], homeX: p[0], homeY: p[1], team: i < 11 ? 0 : 1, role: ROLE[i % 11]
       }));
 
-      const applyDomPositions = (players, ballPos) => {
+      // Estado alvo (servidor) + estado visual (interpolado) para movimento fluido
+      const targetRef = useRef({ players: null, ball: { x: 50, y: 50 } });
+      const visualRef = useRef({ players: null, ball: { x: 50, y: 50 } });
+      const rafInterpRef = useRef(null);
+
+      const paintPositions = (players, ballPos) => {
         const nodes = playersDomRef.current;
-        // Só left/top — CSS já centra com translate(-50%,-50%). Zero animação, pixel a pixel.
         if (nodes && players && players.length) {
           for (let i = 0; i < players.length; i++) {
             const el = nodes[i];
-            if (!el) continue;
-            const p = players[i];
-            el.style.left = p.x + '%';
-            el.style.top = p.y + '%';
+            if (!el || !players[i]) continue;
+            el.style.left = players[i].x + '%';
+            el.style.top = players[i].y + '%';
           }
         }
         if (ballDomRef.current && ballPos) {
           ballDomRef.current.style.left = ballPos.x + '%';
           ballDomRef.current.style.top = ballPos.y + '%';
+        }
+      };
+
+      const applyDomPositions = (players, ballPos) => {
+        // Atualiza alvo; o loop rAF interpola até lá (suave mesmo com 7–8 Hz de rede)
+        if (players && players.length) {
+          targetRef.current.players = players.map(p => ({ x: +p.x, y: +p.y }));
+          if (!visualRef.current.players) {
+            visualRef.current.players = players.map(p => ({ x: +p.x, y: +p.y }));
+          }
+        }
+        if (ballPos) {
+          targetRef.current.ball = { x: +ballPos.x, y: +ballPos.y };
+        }
+      };
+
+      const startInterpLoop = () => {
+        if (rafInterpRef.current) return;
+        const step = () => {
+          const t = targetRef.current;
+          const v = visualRef.current;
+          const lerp = 0.22; // 0–1 por frame; ~fluido a 60fps com updates lentos
+          if (t.players && v.players && t.players.length === v.players.length) {
+            for (let i = 0; i < t.players.length; i++) {
+              v.players[i].x += (t.players[i].x - v.players[i].x) * lerp;
+              v.players[i].y += (t.players[i].y - v.players[i].y) * lerp;
+            }
+          } else if (t.players) {
+            v.players = t.players.map(p => ({ x: p.x, y: p.y }));
+          }
+          v.ball.x += (t.ball.x - v.ball.x) * lerp;
+          v.ball.y += (t.ball.y - v.ball.y) * lerp;
+          paintPositions(v.players, v.ball);
+          rafInterpRef.current = requestAnimationFrame(step);
+        };
+        rafInterpRef.current = requestAnimationFrame(step);
+      };
+
+      const stopInterpLoop = () => {
+        if (rafInterpRef.current) {
+          cancelAnimationFrame(rafInterpRef.current);
+          rafInterpRef.current = null;
         }
       };
 
@@ -8228,13 +8273,20 @@
         const base = makePlayers();
         setPlayerState(base);
         setGoalFx(null);
-        requestAnimationFrame(() => applyDomPositions(base, { x: 50, y: 50 }));
+        targetRef.current = { players: base.map(p => ({ x: p.x, y: p.y })), ball: { x: 50, y: 50 } };
+        visualRef.current = { players: base.map(p => ({ x: p.x, y: p.y })), ball: { x: 50, y: 50 } };
+        paintPositions(base, { x: 50, y: 50 });
+        stopInterpLoop();
       };
 
       useEffect(() => {
         const base = makePlayers();
         setPlayerState(base);
+        targetRef.current = { players: base.map(p => ({ x: p.x, y: p.y })), ball: { x: 50, y: 50 } };
+        visualRef.current = { players: base.map(p => ({ x: p.x, y: p.y })), ball: { x: 50, y: 50 } };
+        paintPositions(base, { x: 50, y: 50 });
         return () => {
+          stopInterpLoop();
           if (timer.current) cancelAnimationFrame(timer.current);
           if (window._footballWs) {
             try { window._footballWs.close(); } catch (e) {}
@@ -8271,6 +8323,7 @@
 
         ws.onopen = () => {
           setStatus('Apito inicial! Os times começam a partida.');
+          startInterpLoop();
           ws.send(JSON.stringify({ action: 'START' }));
         };
 
@@ -8366,6 +8419,7 @@
         };
 
         ws.onclose = () => {
+          stopInterpLoop();
           if (!finished) setBusy(false);
         };
       };
@@ -8383,8 +8437,22 @@
             <div className="pitch-halfway" />
             <div className="pitch-center-circle" />
             <div className="pitch-center-dot" />
-            <div className="pitch-box left" /><div className="pitch-goal left" />
-            <div className="pitch-box right" /><div className="pitch-goal right" />
+            <div className="pitch-box left" />
+            <div className="pitch-box right" />
+            <div className="pitch-goal-area left" />
+            <div className="pitch-goal-area right" />
+            <div className="pitch-goal left" aria-hidden="true">
+              <span className="goal-post top" />
+              <span className="goal-post back" />
+              <span className="goal-post bottom" />
+              <span className="goal-net" />
+            </div>
+            <div className="pitch-goal right" aria-hidden="true">
+              <span className="goal-post top" />
+              <span className="goal-post back" />
+              <span className="goal-post bottom" />
+              <span className="goal-net" />
+            </div>
             {(playerState.length ? playerState : makePlayers()).map((p, i) => (
               <span
                 key={i}
@@ -11445,52 +11513,103 @@
       border-right: 0
     }
 
+    /* Área pequena (6 jardas) */
+    .pitch-goal-area {
+      position: absolute;
+      top: 36%;
+      width: 6%;
+      height: 28%;
+      border: 1px solid rgba(255, 255, 255, .85);
+      pointer-events: none;
+      box-sizing: border-box;
+    }
+    .pitch-goal-area.left { left: 0; border-left: 0; }
+    .pitch-goal-area.right { right: 0; border-right: 0; }
+
+    /* Gol 3D estilo botão — traves + rede */
     .pitch-goal {
       position: absolute;
       top: 39%;
-      width: 3.5%;
+      width: 4.2%;
       height: 22%;
-      border: 1px solid rgba(255, 255, 255, .95)
+      z-index: 2;
+      pointer-events: none;
+      box-sizing: border-box;
+    }
+    .pitch-goal.left { left: -0.2%; }
+    .pitch-goal.right { right: -0.2%; }
+
+    .pitch-goal .goal-post {
+      position: absolute;
+      background: linear-gradient(180deg, #f8fafc 0%, #cbd5e1 50%, #94a3b8 100%);
+      box-shadow: 0 0 0 0.5px rgba(0,0,0,.25);
+    }
+    .pitch-goal .goal-post.top,
+    .pitch-goal .goal-post.bottom {
+      left: 0; right: 0;
+      height: 2.5px;
+      border-radius: 1px;
+    }
+    .pitch-goal .goal-post.top { top: 0; }
+    .pitch-goal .goal-post.bottom { bottom: 0; }
+    .pitch-goal .goal-post.back {
+      top: 0; bottom: 0;
+      width: 2.5px;
+    }
+    .pitch-goal.left .goal-post.back { left: 0; }
+    .pitch-goal.right .goal-post.back { right: 0; }
+
+    .pitch-goal .goal-net {
+      position: absolute;
+      inset: 2px;
+      opacity: .55;
+      background:
+        repeating-linear-gradient(0deg, transparent 0 4px, rgba(226,232,240,.35) 4px 5px),
+        repeating-linear-gradient(90deg, transparent 0 4px, rgba(226,232,240,.35) 4px 5px);
+      pointer-events: none;
+    }
+    .pitch-goal.left .goal-net {
+      background:
+        repeating-linear-gradient(0deg, transparent 0 4px, rgba(226,232,240,.35) 4px 5px),
+        repeating-linear-gradient(90deg, transparent 0 4px, rgba(226,232,240,.35) 4px 5px),
+        linear-gradient(90deg, rgba(15,23,42,.25), transparent 70%);
+    }
+    .pitch-goal.right .goal-net {
+      background:
+        repeating-linear-gradient(0deg, transparent 0 4px, rgba(226,232,240,.35) 4px 5px),
+        repeating-linear-gradient(90deg, transparent 0 4px, rgba(226,232,240,.35) 4px 5px),
+        linear-gradient(270deg, rgba(15,23,42,.25), transparent 70%);
     }
 
-    .pitch-goal.left {
-      left: 0;
-      border-left: 0
-    }
-
-    .pitch-goal.right {
-      right: 0;
-      border-right: 0
-    }
-
-    /* ===== Futebol de botão — peças leves (sem emoji, sem filter, sem animação) ===== */
+    /* ===== Futebol de botão — peça plástica com volume ===== */
     .football-player {
       position: absolute;
-      z-index: 3;
-      width: 18px;
-      height: 18px;
+      z-index: 5;
+      width: 20px;
+      height: 20px;
       margin: 0;
       padding: 0;
       border-radius: 50%;
       box-sizing: border-box;
       transform: translate(-50%, -50%);
       pointer-events: none;
-      /* sem transition: movimento pixel a pixel a cada update do servidor */
-      border: 1.5px solid rgba(0, 0, 0, .55);
+      border: 2px solid rgba(15, 23, 42, .55);
       box-shadow:
-        inset 0 1px 2px rgba(255, 255, 255, .45),
-        inset 0 -2px 3px rgba(0, 0, 0, .25),
-        0 1px 2px rgba(0, 0, 0, .35);
+        inset 0 2px 3px rgba(255, 255, 255, .55),
+        inset 0 -3px 4px rgba(0, 0, 0, .28),
+        0 2px 4px rgba(0, 0, 0, .4),
+        0 0 0 1px rgba(0, 0, 0, .15);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-family: system-ui, -apple-system, sans-serif;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
       font-size: 8px;
       font-weight: 900;
       line-height: 1;
+      letter-spacing: -0.02em;
       color: #fff;
-      text-shadow: 0 1px 1px rgba(0, 0, 0, .5);
-      contain: layout style;
+      text-shadow: 0 1px 1px rgba(0, 0, 0, .45);
+      contain: layout style paint;
     }
 
     .football-player::after {
@@ -11499,80 +11618,93 @@
       z-index: 1;
     }
 
-    /* Lobos (casa) — dourado / âmbar estilo botão clássico */
+    /* anel interno (estilo botão clássico) */
+    .football-player::before {
+      content: "";
+      position: absolute;
+      inset: 3px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, .22);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Lobos — ouro / âmbar */
     .football-player.home {
       background:
-        radial-gradient(circle at 35% 30%, rgba(255, 255, 255, .55) 0%, transparent 45%),
-        linear-gradient(145deg, #f5d76e 0%, #d4af37 45%, #a67c00 100%);
-      color: #1a1200;
-      text-shadow: 0 1px 0 rgba(255, 255, 255, .35);
-      border-color: #6b5200;
+        radial-gradient(circle at 32% 28%, rgba(255, 255, 255, .65) 0%, transparent 42%),
+        radial-gradient(circle at 70% 75%, rgba(0, 0, 0, .18) 0%, transparent 50%),
+        linear-gradient(160deg, #ffe08a 0%, #e0b84a 40%, #b8860b 78%, #7a5a08 100%);
+      color: #1c1400;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, .4);
+      border-color: #5c4508;
     }
 
-    /* Dragões (fora) — azul profundo com reflexo */
+    /* Dragões — azul royal */
     .football-player.away {
       background:
-        radial-gradient(circle at 35% 30%, rgba(255, 255, 255, .4) 0%, transparent 45%),
-        linear-gradient(145deg, #5b8def 0%, #1e40af 50%, #0f172a 100%);
-      color: #fff;
-      border-color: #0c1a40;
+        radial-gradient(circle at 32% 28%, rgba(255, 255, 255, .5) 0%, transparent 42%),
+        radial-gradient(circle at 70% 75%, rgba(0, 0, 0, .25) 0%, transparent 50%),
+        linear-gradient(160deg, #6ea8fe 0%, #2563eb 42%, #1e3a8a 78%, #0f172a 100%);
+      color: #f8fafc;
+      border-color: #0b1e45;
     }
 
-    /* Goleiro — anel branco + levemente maior */
+    /* Goleiro — maior + aro branco */
     .football-player.gk {
-      width: 20px;
-      height: 20px;
+      width: 23px;
+      height: 23px;
       font-size: 7px;
+      z-index: 6;
       box-shadow:
-        inset 0 1px 2px rgba(255, 255, 255, .5),
-        inset 0 -2px 3px rgba(0, 0, 0, .3),
-        0 0 0 2px #f8fafc,
-        0 1px 3px rgba(0, 0, 0, .4);
+        inset 0 2px 3px rgba(255, 255, 255, .55),
+        inset 0 -3px 4px rgba(0, 0, 0, .3),
+        0 0 0 2.5px #f1f5f9,
+        0 0 0 3.5px rgba(15, 23, 42, .45),
+        0 2px 5px rgba(0, 0, 0, .45);
     }
-
     .football-player.home.gk {
       background:
-        radial-gradient(circle at 35% 30%, rgba(255, 255, 255, .6) 0%, transparent 45%),
-        linear-gradient(145deg, #fff8e0 0%, #e8c547 50%, #b8860b 100%);
+        radial-gradient(circle at 32% 28%, rgba(255, 255, 255, .7) 0%, transparent 42%),
+        linear-gradient(160deg, #fff6d6 0%, #f0d060 45%, #c9a227 100%);
     }
-
     .football-player.away.gk {
       background:
-        radial-gradient(circle at 35% 30%, rgba(255, 255, 255, .45) 0%, transparent 45%),
-        linear-gradient(145deg, #93c5fd 0%, #1d4ed8 50%, #1e3a8a 100%);
+        radial-gradient(circle at 32% 28%, rgba(255, 255, 255, .55) 0%, transparent 42%),
+        linear-gradient(160deg, #bfdbfe 0%, #3b82f6 45%, #1e40af 100%);
     }
 
-    /* Bola — botão branco/preto simples, sem emoji e sem pulse */
+    /* Bola — botão redondo branco com manchas */
     .football-ball {
       position: absolute;
-      z-index: 4;
-      width: 11px;
-      height: 11px;
+      z-index: 7;
+      width: 12px;
+      height: 12px;
       margin: 0;
       padding: 0;
       border-radius: 50%;
       transform: translate(-50%, -50%);
       pointer-events: none;
-      border: 1px solid #1e293b;
+      border: 1.5px solid #0f172a;
       background:
-        radial-gradient(circle at 32% 28%, #ffffff 0%, #e2e8f0 40%, #94a3b8 100%);
+        radial-gradient(circle at 30% 28%, #ffffff 0%, #e8eef5 45%, #94a3b8 100%);
       box-shadow:
-        inset 0 1px 1px rgba(255, 255, 255, .8),
-        0 1px 2px rgba(0, 0, 0, .4);
-      contain: layout style;
+        inset 0 1px 2px rgba(255, 255, 255, .9),
+        inset 0 -2px 3px rgba(0, 0, 0, .2),
+        0 2px 3px rgba(0, 0, 0, .4);
+      contain: layout style paint;
     }
-
-    /* pentágonos simulados com radial spots leves (barato) */
     .football-ball::before {
       content: "";
       position: absolute;
       inset: 2px;
       border-radius: 50%;
       background:
-        radial-gradient(circle at 50% 18%, #0f172a 0 18%, transparent 19%),
-        radial-gradient(circle at 18% 62%, #0f172a 0 14%, transparent 15%),
-        radial-gradient(circle at 82% 62%, #0f172a 0 14%, transparent 15%);
-      opacity: .85;
+        radial-gradient(circle at 50% 15%, #0f172a 0 17%, transparent 18%),
+        radial-gradient(circle at 15% 60%, #0f172a 0 13%, transparent 14%),
+        radial-gradient(circle at 85% 60%, #0f172a 0 13%, transparent 14%),
+        radial-gradient(circle at 50% 88%, #0f172a 0 12%, transparent 13%);
+      opacity: .9;
       pointer-events: none;
     }
 
@@ -11845,19 +11977,21 @@
       }
 
       .football-player {
-        width: 16px;
-        height: 16px;
+        width: 17px;
+        height: 17px;
         font-size: 7px;
+        border-width: 1.5px;
       }
       .football-player.gk {
-        width: 18px;
-        height: 18px;
+        width: 19px;
+        height: 19px;
         font-size: 6px;
       }
       .football-ball {
         width: 10px;
         height: 10px;
       }
+      .pitch-goal { width: 5%; }
     }
   </style>
   <style id="fortune-tiger-fx">

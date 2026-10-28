@@ -10,33 +10,41 @@ public class Ball {
 
     public void updatePhysics() {
         if (owner != null) {
-            double offsetX = owner.getTeam() == Enums.TeamSide.HOME ? 1.5 : -1.5;
+            double offsetX = owner.getTeam() == Enums.TeamSide.HOME ? 1.4 : -1.4;
             this.position.x = owner.getPosition().x + offsetX;
             this.position.y = owner.getPosition().y;
             this.velocity.x = 0;
             this.velocity.y = 0;
-        } else {
-            this.position.add(this.velocity);
-            // Atrito um pouco maior → bola não voa longe demais
-            this.velocity.mult(0.94);
+            return;
+        }
 
-            if (this.position.y <= 2) { this.position.y = 2; this.velocity.y *= -0.75; }
-            if (this.position.y >= 98) { this.position.y = 98; this.velocity.y *= -0.75; }
+        this.position.add(this.velocity);
+        this.velocity.mult(0.935);
 
-            boolean isOutsideGoalY = this.position.y < 39 || this.position.y > 61;
-            if (this.position.x <= 2 && isOutsideGoalY) { this.position.x = 2; this.velocity.x *= -0.75; }
-            if (this.position.x >= 98 && isOutsideGoalY) { this.position.x = 98; this.velocity.x *= -0.75; }
+        // Laterais
+        if (this.position.y <= 2) { this.position.y = 2; this.velocity.y *= -0.72; }
+        if (this.position.y >= 98) { this.position.y = 98; this.velocity.y *= -0.72; }
 
-            // Para a bola se estiver quase parada (evita micro-tremores)
-            if (this.velocity.mag() < 0.05) {
-                this.velocity.x = 0;
-                this.velocity.y = 0;
-            }
+        // Fundo — fora do gol rebate; dentro do gol passa (gol detectado no engine)
+        boolean outsideGoalMouth = this.position.y < 39 || this.position.y > 61;
+        if (this.position.x <= 1.5 && outsideGoalMouth) {
+            this.position.x = 1.5;
+            this.velocity.x *= -0.72;
+        }
+        if (this.position.x >= 98.5 && outsideGoalMouth) {
+            this.position.x = 98.5;
+            this.velocity.x *= -0.72;
+        }
+
+        if (this.velocity.mag() < 0.04) {
+            this.velocity.x = 0;
+            this.velocity.y = 0;
         }
     }
 
     public void kick(Vector2D force) {
         this.owner = null;
-        this.velocity.add(force);
+        this.velocity.x = force.x;
+        this.velocity.y = force.y;
     }
 }
