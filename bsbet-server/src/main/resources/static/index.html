@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#070605">
-  <title>BerimBET</title>
+  <title>bsBET</title>
 
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -4046,7 +4046,7 @@
           <div onClick={closeMenu} aria-hidden="true" className={cn("md:hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-30 transition-opacity duration-300", isOpen ? "opacity-100" : "opacity-0 pointer-events-none")} />
           <aside className={cn("fixed inset-y-0 left-0 w-64 max-w-[85vw] overflow-y-auto bg-slate-950 border-r border-slate-800 p-4 transform sidebar-smooth z-40", isOpen ? "translate-x-0" : "-translate-x-full", hidden ? "sidebar-hidden" : "md:translate-x-0")}>
             <div className="flex items-center justify-between mb-8">
-              <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-500">BerimBET</h1>
+              <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-500">bsBET</h1>
               <div className="flex items-center gap-1">
                 <button className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition-colors" aria-label="Fechar barra lateral" title="Fechar barra lateral" onClick={toggleSidebar}><Icon path={Icons.ChevronLeft} className="w-5 h-5" /></button>
                 <button className="md:hidden text-slate-400 p-2 -m-2" aria-label="Fechar menu" onClick={closeMenu}><Icon path={Icons.X} /></button>
@@ -4080,7 +4080,7 @@
             </div>
             <div className="mt-8 pt-4 border-t border-amber-500/20 space-y-2 text-[11px] leading-relaxed text-slate-500 relative z-50 pointer-events-auto">
               <div>créditos: <a href="https://github.com/Igor-Dias-2010" target="_blank" rel="noopener noreferrer" onClick={(e) => { e.stopPropagation(); window.open('https://github.com/Igor-Dias-2010', '_blank', 'noopener,noreferrer'); }} className="text-amber-400 hover:text-amber-200 underline underline-offset-2 cursor-pointer pointer-events-auto">Igor-Dias-2010</a></div>
-              <div>repositório: <a href="https://github.com/Igor-Dias-2010/berimbet" target="_blank" rel="noopener noreferrer" onClick={(e) => { e.stopPropagation(); window.open('https://github.com/Igor-Dias-2010/berimbet', '_blank', 'noopener,noreferrer'); }} className="text-amber-400 hover:text-amber-200 underline underline-offset-2 cursor-pointer pointer-events-auto">BerimBET</a></div>
+              <div>repositório: <a href="https://github.com/Igor-Dias-2010/berimbet" target="_blank" rel="noopener noreferrer" onClick={(e) => { e.stopPropagation(); window.open('https://github.com/Igor-Dias-2010/berimbet', '_blank', 'noopener,noreferrer'); }} className="text-amber-400 hover:text-amber-200 underline underline-offset-2 cursor-pointer pointer-events-auto">bsBET</a></div>
             </div>
           </aside>
         </>
@@ -8198,29 +8198,19 @@
 
       const applyDomPositions = (players, ballPos) => {
         const nodes = playersDomRef.current;
-        if (nodes && nodes.length) {
-          for (let i = 0; i < players.length; i++) {
-            const el = nodes[i];
-            if (!el) continue;
-            const p = players[i];
-            el.style.transform = `translate(-50%,-50%) translate3d(${p.x}cqw, ${p.y}cqh, 0)`;
-          }
-        }
-        // fallback % positioning via left/top for reliability
-        if (nodes && nodes.length) {
+        // Só left/top — CSS já centra com translate(-50%,-50%). Zero animação, pixel a pixel.
+        if (nodes && players && players.length) {
           for (let i = 0; i < players.length; i++) {
             const el = nodes[i];
             if (!el) continue;
             const p = players[i];
             el.style.left = p.x + '%';
             el.style.top = p.y + '%';
-            el.style.transform = 'translate(-50%,-50%) translateZ(0)';
           }
         }
         if (ballDomRef.current && ballPos) {
           ballDomRef.current.style.left = ballPos.x + '%';
           ballDomRef.current.style.top = ballPos.y + '%';
-          ballDomRef.current.style.transform = 'translate(-50%,-50%) translateZ(0)';
         }
       };
 
@@ -8299,17 +8289,10 @@
               // Posições: SOMENTE DOM direto — sem setState de players/ball
               // Isso evita re-render React de 22 nós a cada mensagem
               if (data.players && data.players.length) {
-                const mapped = data.players.map(p => ({
-                  x: p.x,
-                  y: p.y,
-                  homeX: p.x,
-                  homeY: p.y,
-                  team: p.team,
-                  role: 0
-                }));
-                applyDomPositions(mapped, data.ball || { x: 50, y: 50 });
+                // Só atualiza posição no DOM — role/número já estão no elemento montado
+                applyDomPositions(data.players, data.ball || { x: 50, y: 50 });
               } else if (data.ball) {
-                applyDomPositions([], data.ball);
+                applyDomPositions(null, data.ball);
               }
             }
 
@@ -8405,19 +8388,30 @@
             {(playerState.length ? playerState : makePlayers()).map((p, i) => (
               <span
                 key={i}
-                ref={el => { playersDomRef.current[i] = el; }}
-                className={cn('football-player', p.team === 0 ? 'home' : 'away', busy && 'moving')}
-                style={{ left: p.x + '%', top: p.y + '%' }}
-              >
-                {p.team === 0 ? '🚶‍➡️' : '🚶‍♂️'}
-              </span>
+                ref={el => {
+                  playersDomRef.current[i] = el;
+                  if (el && !el.dataset.ready) {
+                    el.style.left = p.x + '%';
+                    el.style.top = p.y + '%';
+                    el.dataset.ready = '1';
+                  }
+                }}
+                className={cn('football-player', p.team === 0 ? 'home' : 'away', p.role === 0 && 'gk')}
+                data-n={(i % 11) + 1}
+              />
             ))}
             <span
-              ref={ballDomRef}
-              className={cn('football-ball', busy && 'active')}
-              style={{ left: ball.x + '%', top: ball.y + '%' }}
+              ref={el => {
+                ballDomRef.current = el;
+                if (el && !el.dataset.ready) {
+                  el.style.left = '50%';
+                  el.style.top = '50%';
+                  el.dataset.ready = '1';
+                }
+              }}
+              className="football-ball"
               aria-label="Bola"
-            >⚽</span>
+            />
             {goalFx && (
               <div className={cn('football-goal-fx', goalFx.kind === 'crown' ? 'is-crown' : 'is-skull')} key={goalFx.id}>
                 <div className="football-goal-fx-banner">{goalFx.teamName} fez um gol</div>
@@ -9160,7 +9154,7 @@
       { id: 'collect_world_engine', icon: '⚙️', name: 'Motor do Mundo', tag: 'Colecionável', desc: 'Artefato monumental que parece manter um universo em movimento.', kind: 'collectible', chipPrice: 0, cashPrice: 0, rarity: 'Relíquia Suprema', achievement: { game: 'Campo Minado', wins: 5 } },
       { id: 'collect_void_crown', icon: '👑', name: 'Coroa do Vazio', tag: 'Colecionável', desc: 'Uma coroa cósmica de coleção, reservada a quem domina a mesa.', kind: 'collectible', chipPrice: 42000, cashPrice: 14000, rarity: 'Relíquia Suprema', achievement: { game: 'Blackjack', wins: 5 } },
       { id: 'collect_galaxy_ship', icon: '🛸', name: 'Arca Galáctica', tag: 'Colecionável', desc: 'Nave-museu colossal, uma das peças mais raras do mercado.', kind: 'collectible', chipPrice: 0, cashPrice: 18000, rarity: 'Relíquia Suprema', achievement: { game: 'Roleta Europeia', wins: 5 } },
-      { id: 'collect_berimbet_core', icon: '💠', name: 'Núcleo BerimBET', tag: 'Colecionável', desc: 'Artefato central da coleção. Exige uma sequência de vitórias e um grande investimento fictício.', kind: 'collectible', chipPrice: 65000, cashPrice: 25000, rarity: 'Único', achievement: { game: 'Bac Bo', wins: 5 } },
+      { id: 'collect_berimbet_core', icon: '💠', name: 'Núcleo bsBET', tag: 'Colecionável', desc: 'Artefato central da coleção. Exige uma sequência de vitórias e um grande investimento fictício.', kind: 'collectible', chipPrice: 65000, cashPrice: 25000, rarity: 'Único', achievement: { game: 'Bac Bo', wins: 5 } },
     ];
 
     const Lobby = ({ marketOnly = false }) => {
@@ -9186,7 +9180,7 @@
               <button onClick={() => marketOnly ? setView('lobby') : setMarketOpen(false)} className="market-back-btn mb-4 rounded-lg px-3 py-2 text-sm font-bold">← Voltar aos jogos</button>
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <div className="text-[10px] sm:text-xs font-black tracking-[.22em] text-amber-300 uppercase">BerimBET Exclusivo</div>
+                  <div className="text-[10px] sm:text-xs font-black tracking-[.22em] text-amber-300 uppercase">bsBET Exclusivo</div>
                   <h2 className="text-2xl sm:text-3xl font-black text-white mt-1">🏆 Mercado de Prêmios</h2>
                   <p className="text-sm text-slate-300 mt-2 max-w-2xl">Escolha entre consumíveis com efeitos de uso único e colecionáveis virtuais. Os valores são fictícios; colecionáveis não dão vantagens de jogo. Os créditos concedem no máximo R$ 7.500 por unidade.</p>
                 </div>
@@ -11469,54 +11463,117 @@
       border-right: 0
     }
 
+    /* ===== Futebol de botão — peças leves (sem emoji, sem filter, sem animação) ===== */
     .football-player {
       position: absolute;
       z-index: 3;
-      transform: translate(-50%, -50%) translateZ(0);
-      font-size: 34px;
-      line-height: 1;
-      white-space: nowrap;
-      filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .5));
-      will-change: left, top, transform;
-      backface-visibility: hidden;
+      width: 18px;
+      height: 18px;
+      margin: 0;
+      padding: 0;
+      border-radius: 50%;
+      box-sizing: border-box;
+      transform: translate(-50%, -50%);
       pointer-events: none;
-      transition: left 0.08s linear, top 0.08s linear
+      /* sem transition: movimento pixel a pixel a cada update do servidor */
+      border: 1.5px solid rgba(0, 0, 0, .55);
+      box-shadow:
+        inset 0 1px 2px rgba(255, 255, 255, .45),
+        inset 0 -2px 3px rgba(0, 0, 0, .25),
+        0 1px 2px rgba(0, 0, 0, .35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 8px;
+      font-weight: 900;
+      line-height: 1;
+      color: #fff;
+      text-shadow: 0 1px 1px rgba(0, 0, 0, .5);
+      contain: layout style;
     }
 
-    .football-player.home,
+    .football-player::after {
+      content: attr(data-n);
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Lobos (casa) — dourado / âmbar estilo botão clássico */
+    .football-player.home {
+      background:
+        radial-gradient(circle at 35% 30%, rgba(255, 255, 255, .55) 0%, transparent 45%),
+        linear-gradient(145deg, #f5d76e 0%, #d4af37 45%, #a67c00 100%);
+      color: #1a1200;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, .35);
+      border-color: #6b5200;
+    }
+
+    /* Dragões (fora) — azul profundo com reflexo */
     .football-player.away {
-      background: none
+      background:
+        radial-gradient(circle at 35% 30%, rgba(255, 255, 255, .4) 0%, transparent 45%),
+        linear-gradient(145deg, #5b8def 0%, #1e40af 50%, #0f172a 100%);
+      color: #fff;
+      border-color: #0c1a40;
     }
 
-    .football-player.moving {
-      animation: none
+    /* Goleiro — anel branco + levemente maior */
+    .football-player.gk {
+      width: 20px;
+      height: 20px;
+      font-size: 7px;
+      box-shadow:
+        inset 0 1px 2px rgba(255, 255, 255, .5),
+        inset 0 -2px 3px rgba(0, 0, 0, .3),
+        0 0 0 2px #f8fafc,
+        0 1px 3px rgba(0, 0, 0, .4);
     }
 
+    .football-player.home.gk {
+      background:
+        radial-gradient(circle at 35% 30%, rgba(255, 255, 255, .6) 0%, transparent 45%),
+        linear-gradient(145deg, #fff8e0 0%, #e8c547 50%, #b8860b 100%);
+    }
+
+    .football-player.away.gk {
+      background:
+        radial-gradient(circle at 35% 30%, rgba(255, 255, 255, .45) 0%, transparent 45%),
+        linear-gradient(145deg, #93c5fd 0%, #1d4ed8 50%, #1e3a8a 100%);
+    }
+
+    /* Bola — botão branco/preto simples, sem emoji e sem pulse */
     .football-ball {
       position: absolute;
       z-index: 4;
-      transform: translate(-50%, -50%) translateZ(0);
-      font-size: 16px;
-      line-height: 1;
-      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .55));
-      will-change: left, top, transform;
-      backface-visibility: hidden;
+      width: 11px;
+      height: 11px;
+      margin: 0;
+      padding: 0;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
       pointer-events: none;
-      transition: left 0.08s linear, top 0.08s linear
+      border: 1px solid #1e293b;
+      background:
+        radial-gradient(circle at 32% 28%, #ffffff 0%, #e2e8f0 40%, #94a3b8 100%);
+      box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, .8),
+        0 1px 2px rgba(0, 0, 0, .4);
+      contain: layout style;
     }
 
-    .football-ball.active {
-      animation: footballBallPulse .4s ease-in-out infinite alternate
-    }
-
-    @keyframes footballBallPulse {
-      from {
-        transform: translate(-50%, -50%) translateZ(0) scale(.94)
-      }
-
-      to {
-        transform: translate(-50%, -50%) translateZ(0) scale(1.08)
-      }
+    /* pentágonos simulados com radial spots leves (barato) */
+    .football-ball::before {
+      content: "";
+      position: absolute;
+      inset: 2px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 50% 18%, #0f172a 0 18%, transparent 19%),
+        radial-gradient(circle at 18% 62%, #0f172a 0 14%, transparent 15%),
+        radial-gradient(circle at 82% 62%, #0f172a 0 14%, transparent 15%);
+      opacity: .85;
+      pointer-events: none;
     }
 
     .football-status {
@@ -11788,7 +11845,18 @@
       }
 
       .football-player {
-        font-size: 30px
+        width: 16px;
+        height: 16px;
+        font-size: 7px;
+      }
+      .football-player.gk {
+        width: 18px;
+        height: 18px;
+        font-size: 6px;
+      }
+      .football-ball {
+        width: 10px;
+        height: 10px;
       }
     }
   </style>
