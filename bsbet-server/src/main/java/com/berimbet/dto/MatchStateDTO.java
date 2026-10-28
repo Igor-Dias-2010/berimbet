@@ -9,14 +9,12 @@ import java.util.List;
 @Data
 public class MatchStateDTO {
     private String type = "STATE";
-    private String formation;
     private int minute;
     private int[] score;
     private BallDTO ball;
     private List<PlayerDTO> players;
 
     public MatchStateDTO(MatchEngine engine) {
-        this.formation = engine.getFormationLabel();
         this.minute = engine.getMatchMinute();
         this.score = new int[]{engine.getHomeScore(), engine.getAwayScore()};
         double bx = engine.getBall().getPosition().x;

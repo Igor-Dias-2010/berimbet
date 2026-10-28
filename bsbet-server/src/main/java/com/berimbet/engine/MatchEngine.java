@@ -4,16 +4,14 @@ import com.berimbet.model.*;
 import lombok.Getter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 import java.util.function.BiConsumer;
 
 /**
- * Motor com formações reais embutidas (sem classe extra):
- * 4-3-3, 4-4-2, 4-2-3-1, 3-5-2, 3-4-3 — uma sorteada por partida.
+ * 4-3-3 com posições e números clássicos (1 GK, 2 RB, 3 LB, 4 CDM, 5/6 CB, 7 RW, 8/10 CM, 9 ST, 11 LW).
+ * Referências: IFAB (área penal 16,5 m; área do gol 5,5 m) + formação 4-3-3 padrão.
  */
 public class MatchEngine implements Runnable {
     @Getter private final String matchId;
-    @Getter private final String formationLabel;
     @Getter private final List<Player> players = new ArrayList<>();
     @Getter private final Ball ball = new Ball();
     @Getter private int homeScore = 0, awayScore = 0, matchMinute = 0;
@@ -28,94 +26,9 @@ public class MatchEngine implements Runnable {
     private static final double NS_PER_TICK = 1_000_000_000.0 / TICKS_PER_SEC;
     private static final int SEND_EVERY = 2;
     private static final double REAL_SECONDS_PER_MATCH_MINUTE = 0.55;
-    private static final Random RNG = new Random();
 
-    // ── Formações: label, posições HOME [11][2], roles[11], shirts[11] ──
-    private static final Object[][] FORMATIONS = {
-        {
-            "4-3-3",
-            new double[][]{
-                {3.5, 50},
-                {20, 82}, {16, 61}, {16, 39}, {20, 18},
-                {40, 68}, {36, 50}, {40, 32},
-                {62, 80}, {68, 50}, {62, 20}
-            },
-            new Enums.PlayerRole[]{
-                Enums.PlayerRole.GOALKEEPER,
-                Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER,
-                Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER,
-                Enums.PlayerRole.FORWARD, Enums.PlayerRole.FORWARD, Enums.PlayerRole.FORWARD
-            },
-            new int[]{1, 2, 5, 6, 3, 8, 4, 10, 7, 9, 11}
-        },
-        {
-            "4-4-2",
-            new double[][]{
-                {3.5, 50},
-                {20, 82}, {16, 60}, {16, 40}, {20, 18},
-                {42, 82}, {40, 60}, {40, 40}, {42, 18},
-                {66, 60}, {66, 40}
-            },
-            new Enums.PlayerRole[]{
-                Enums.PlayerRole.GOALKEEPER,
-                Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER,
-                Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER,
-                Enums.PlayerRole.FORWARD, Enums.PlayerRole.FORWARD
-            },
-            new int[]{1, 2, 5, 6, 3, 7, 4, 8, 11, 9, 10}
-        },
-        {
-            "4-2-3-1",
-            new double[][]{
-                {3.5, 50},
-                {20, 82}, {16, 60}, {16, 40}, {20, 18},
-                {34, 62}, {34, 38},
-                {52, 80}, {52, 50}, {52, 20},
-                {70, 50}
-            },
-            new Enums.PlayerRole[]{
-                Enums.PlayerRole.GOALKEEPER,
-                Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER,
-                Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER,
-                Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER,
-                Enums.PlayerRole.FORWARD
-            },
-            new int[]{1, 2, 5, 6, 3, 4, 8, 7, 10, 11, 9}
-        },
-        {
-            "3-5-2",
-            new double[][]{
-                {3.5, 50},
-                {16, 70}, {14, 50}, {16, 30},
-                {36, 88}, {38, 65}, {36, 50}, {38, 35}, {36, 12},
-                {66, 58}, {66, 42}
-            },
-            new Enums.PlayerRole[]{
-                Enums.PlayerRole.GOALKEEPER,
-                Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER,
-                Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER,
-                Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER,
-                Enums.PlayerRole.FORWARD, Enums.PlayerRole.FORWARD
-            },
-            new int[]{1, 4, 5, 6, 2, 8, 10, 7, 3, 9, 11}
-        },
-        {
-            "3-4-3",
-            new double[][]{
-                {3.5, 50},
-                {16, 70}, {14, 50}, {16, 30},
-                {40, 82}, {38, 60}, {38, 40}, {40, 18},
-                {64, 80}, {68, 50}, {64, 20}
-            },
-            new Enums.PlayerRole[]{
-                Enums.PlayerRole.GOALKEEPER,
-                Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER,
-                Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER,
-                Enums.PlayerRole.FORWARD, Enums.PlayerRole.FORWARD, Enums.PlayerRole.FORWARD
-            },
-            new int[]{1, 4, 5, 6, 2, 8, 10, 3, 7, 9, 11}
-        }
-    };
+    /** Números clássicos na ordem do array de jogadores */
+    public static final int[] SHIRT_NUMBERS = {1, 2, 5, 6, 3, 8, 4, 10, 7, 9, 11};
 
     public MatchEngine(String matchId, Runnable onTickCallback, Runnable onMatchEndCallback,
                        BiConsumer<String, MatchEngine> onEventCallback) {
@@ -123,19 +36,51 @@ public class MatchEngine implements Runnable {
         this.onTickCallback = onTickCallback;
         this.onMatchEndCallback = onMatchEndCallback;
         this.onEventCallback = onEventCallback;
-        Object[] f = FORMATIONS[RNG.nextInt(FORMATIONS.length)];
-        this.formationLabel = (String) f[0];
-        setupTeams((double[][]) f[1], (Enums.PlayerRole[]) f[2], (int[]) f[3]);
+        setupTeams();
     }
 
-    private void setupTeams(double[][] home, Enums.PlayerRole[] roles, int[] shirts) {
+    private void setupTeams() {
+        // HOME ataca para +X (direita). Coordenadas campo 0–100.
+        // Ordem: GK, RB, RCB, LCB, LB, RCM, CDM, LCM, RW, ST, LW
+        double[][] homeForm = {
+            {3.5, 50},   // 1  GK  — colado na linha do gol
+            {20, 82},    // 2  RB
+            {16, 61},    // 5  RCB
+            {16, 39},    // 6  LCB
+            {20, 18},    // 3  LB
+            {40, 68},    // 8  RCM
+            {36, 50},    // 4  CDM
+            {40, 32},    // 10 LCM
+            {62, 80},    // 7  RW
+            {68, 50},    // 9  ST
+            {62, 20}     // 11 LW
+        };
+        double[][] awayForm = {
+            {96.5, 50},  // 1  GK
+            {80, 18},    // 2  RB (away ataca -X; espelhado)
+            {84, 39},    // 5  RCB
+            {84, 61},    // 6  LCB
+            {80, 82},    // 3  LB
+            {60, 32},    // 8  RCM
+            {64, 50},    // 4  CDM
+            {60, 68},    // 10 LCM
+            {38, 20},    // 7  RW
+            {32, 50},    // 9  ST
+            {38, 80}     // 11 LW
+        };
+        Enums.PlayerRole[] roles = {
+            Enums.PlayerRole.GOALKEEPER,
+            Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER,
+            Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER,
+            Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER,
+            Enums.PlayerRole.FORWARD, Enums.PlayerRole.FORWARD, Enums.PlayerRole.FORWARD
+        };
+        // subRole: 0=GK, 1=RB, 2=RCB, 3=LCB, 4=LB, 5=RCM, 6=CDM, 7=LCM, 8=RW, 9=ST, 10=LW
         for (int i = 0; i < 11; i++) {
-            double ax = 100.0 - home[i][0];
-            double ay = 100.0 - home[i][1];
-            players.add(new Player(i, Enums.TeamSide.HOME, roles[i], i, shirts[i],
-                new Vector2D(home[i][0], home[i][1])));
-            players.add(new Player(i + 11, Enums.TeamSide.AWAY, roles[i], i, shirts[i],
-                new Vector2D(ax, ay)));
+            players.add(new Player(i, Enums.TeamSide.HOME, roles[i], i, SHIRT_NUMBERS[i],
+                new Vector2D(homeForm[i][0], homeForm[i][1])));
+            players.add(new Player(i + 11, Enums.TeamSide.AWAY, roles[i], i, SHIRT_NUMBERS[i],
+                new Vector2D(awayForm[i][0], awayForm[i][1])));
         }
     }
 
@@ -150,9 +95,6 @@ public class MatchEngine implements Runnable {
 
     @Override
     public void run() {
-        if (onEventCallback != null) {
-            onEventCallback.accept("Formação: " + formationLabel, this);
-        }
         long lastTime = System.nanoTime();
         double delta = 0;
         while (isRunning) {
@@ -206,16 +148,20 @@ public class MatchEngine implements Runnable {
         if (p.getCooldownTicks() > 0) return;
         if (p.getPosition().distance(ball.getPosition()) >= 2.5) return;
 
+        // Goleiro só pega bola DENTRO da própria área
         if (p.getRole() == Enums.PlayerRole.GOALKEEPER) {
             if (p.isInOwnPenaltyArea(ball.getPosition())) {
                 ball.setOwner(p);
             }
             return;
         }
+        // Linha de campo NÃO fica parada dentro da boca do gol
         if (isInGoalMouth(p.getPosition(), p.getTeam())) return;
+
         ball.setOwner(p);
     }
 
+    /** Boca do gol + poucos metros à frente — zagueiro não “vira goleiro” */
     public boolean isInGoalMouth(Vector2D pos, Enums.TeamSide team) {
         if (pos.y < 36 || pos.y > 64) return false;
         if (team == Enums.TeamSide.HOME) return pos.x < 9;
