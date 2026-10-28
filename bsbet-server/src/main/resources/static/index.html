@@ -8246,154 +8246,144 @@
         setPlayerState(base);
         return () => {
           if (timer.current) cancelAnimationFrame(timer.current);
+          if (window._footballWs) {
+            try { window._footballWs.close(); } catch (e) {}
+          }
         };
       }, []);
 
-      const outcomeMatches = (finalScore) => {
-        const [w, d] = finalScore;
-        const total = w + d;
+      const start = () => {
+        if (busy) return;
 
-        const resultOk =
-          selections.result === 'wolves' ? w > d :
-            selections.result === 'draw' ? w === d :
-              d > w;
+        const selectedText = `${selectedResult[1]} · ${selectedGoals[1]} gols · Ambos: ${selectedBtts[1]}`;
+        const id = placeBet(Number(bet), 'Futebol', `${selectedText} @ ${combinedOdds.toFixed(2)}x`);
+        if (!id) return;
 
-        const goalsOk = selections.goals === 'over' ? total >= 3 : total <= 2;
-        const start = () => {
-          if (busy) return;
+        if (timer.current) cancelAnimationFrame(timer.current);
+        setBusy(true);
+        setFinished(false);
+        setScore([0, 0]);
+        setMinute(0);
+        setEvents([]);
+        setBall({ x: 50, y: 50 });
+        setGoalFx(null);
+        setStatus('Conectando com o servidor...');
+        sfx(hackSettings, 'button');
 
-          const selectedText = `${selectedResult[1]} · ${selectedGoals[1]} gols · Ambos: ${selectedBtts[1]}`;
-          const id = placeBet(Number(bet), 'Futebol', `${selectedText} @ ${combinedOdds.toFixed(2)}x`);
-          if (!id) return;
+        if (window._footballWs) {
+          try { window._footballWs.close(); } catch (e) {}
+        }
 
-          if (timer.current) cancelAnimationFrame(timer.current);
-          setBusy(true);
-          setFinished(false);
-          setScore([0, 0]);
-          setMinute(0);
-          setEvents([]);
-          setBall({ x: 50, y: 50 });
-          setGoalFx(null);
-          setStatus('Conectando com o servidor...');
-          sfx(hackSettings, 'button');
+        const ws = new WebSocket('wss://berimbet-server.onrender.com/ws/football');
+        window._footballWs = ws;
 
-          // Fecha conexão anterior se existir
-          if (window._footballWs) {
-            try { window._footballWs.close(); } catch (e) { }
-          }
+        let finalScore = [0, 0];
 
-          const ws = new WebSocket('wss://berimbet-server.onrender.com/ws/football');
-          window._footballWs = ws;
-
-          let finalScore = [0, 0];
-
-          ws.onopen = () => {
-            setStatus('Apito inicial! Os times começam a partida.');
-            ws.send(JSON.stringify({ action: 'START' }));
-          };
-
-          ws.onmessage = (event) => {
-            try {
-              const data = JSON.parse(event.data);
-
-              // ===== Atualização de estado (a cada tick) =====
-              if (data.type === 'STATE') {
-                setMinute(data.minute || 0);
-                setScore(data.score || [0, 0]);
-                finalScore = data.score || [0, 0];
-
-                if (data.ball) {
-                  setBall({ x: data.ball.x, y: data.ball.y });
-                }
-
-                if (data.players && data.players.length) {
-                  const mapped = data.players.map(p => ({
-                    x: p.x,
-                    y: p.y,
-                    homeX: p.x,
-                    homeY: p.y,
-                    team: p.team,
-                    role: 0
-                  }));
-                  setPlayerState(mapped);
-                  applyDomPositions(mapped, data.ball || { x: 50, y: 50 });
-                }
-              }
-
-              // ===== Evento (gol etc) =====
-              if (data.type === 'EVENT') {
-                setStatus(data.message || 'Evento!');
-                setEvents(prev => [...prev.slice(-8), data.message]);
-                sfx(hackSettings, 'win');
-              }
-
-              // ===== Fim de jogo =====
-              if (data.type === 'END') {
-                const home = data.homeScore ?? finalScore[0] ?? 0;
-                const away = data.awayScore ?? finalScore[1] ?? 0;
-                setScore([home, away]);
-                setMinute(90);
-                setStatus(data.message || 'Fim de Jogo');
-                setFinished(true);
-                setBusy(false);
-
-                // ========== LÓGICA DE VITÓRIA / DERROTA ==========
-                let won = true;
-
-                // 1. Resultado (1X2)
-                if (selections.result === 'wolves') {
-                  if (!(home > away)) won = false;
-                } else if (selections.result === 'dragons') {
-                  if (!(away > home)) won = false;
-                } else if (selections.result === 'draw') {
-                  if (home !== away) won = false;
-                }
-
-                // 2. Total de gols (Over/Under 2.5)
-                const totalGoals = home + away;
-                if (selections.goals === 'over') {
-                  if (!(totalGoals > 2.5)) won = false;
-                } else if (selections.goals === 'under') {
-                  if (!(totalGoals < 2.5)) won = false;
-                }
-
-                // 3. Ambos marcam (BTTS)
-                if (selections.btts === 'yes') {
-                  if (!(home > 0 && away > 0)) won = false;
-                } else if (selections.btts === 'no') {
-                  if (home > 0 && away > 0) won = false;
-                }
-
-                // Aplica o resultado da aposta
-                settleBet(id, won);
-
-                if (won) {
-                  setStatus(`Vitória! Placar final ${home} x ${away}`);
-                  sfx(hackSettings, 'win');
-                } else {
-                  setStatus(`Derrota. Placar final ${home} x ${away}`);
-                  sfx(hackSettings, 'lose');
-                }
-
-                try { ws.close(); } catch (e) { }
-              }
-            } catch (err) {
-              console.error('Erro ao processar mensagem do WebSocket:', err);
-            }
-          };
-
-          ws.onerror = () => {
-            setStatus('Erro de conexão com o servidor.');
-            setBusy(false);
-          };
-
-          ws.onclose = () => {
-            if (!finished) {
-              setBusy(false);
-            }
-          };
+        ws.onopen = () => {
+          setStatus('Apito inicial! Os times começam a partida.');
+          ws.send(JSON.stringify({ action: 'START' }));
         };
-      }
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+
+            if (data.type === 'STATE') {
+              setMinute(data.minute || 0);
+              setScore(data.score || [0, 0]);
+              finalScore = data.score || [0, 0];
+
+              if (data.ball) {
+                setBall({ x: data.ball.x, y: data.ball.y });
+              }
+
+              if (data.players && data.players.length) {
+                const mapped = data.players.map(p => ({
+                  x: p.x,
+                  y: p.y,
+                  homeX: p.x,
+                  homeY: p.y,
+                  team: p.team,
+                  role: 0
+                }));
+                setPlayerState(mapped);
+                applyDomPositions(mapped, data.ball || { x: 50, y: 50 });
+              }
+            }
+
+            if (data.type === 'EVENT') {
+              setStatus(data.message || 'Evento!');
+              setEvents(prev => [...prev.slice(-8), data.message]);
+              sfx(hackSettings, 'win');
+            }
+
+            if (data.type === 'END') {
+              const home = data.homeScore ?? finalScore[0] ?? 0;
+              const away = data.awayScore ?? finalScore[1] ?? 0;
+              setScore([home, away]);
+              setMinute(90);
+              setStatus(data.message || 'Fim de Jogo');
+              setFinished(true);
+              setBusy(false);
+
+              // ===== Lógica de vitória/derrota =====
+              let won = true;
+
+              // 1X2
+              if (selections.result === 'wolves') {
+                if (!(home > away)) won = false;
+              } else if (selections.result === 'dragons') {
+                if (!(away > home)) won = false;
+              } else if (selections.result === 'draw') {
+                if (home !== away) won = false;
+              }
+
+              // Over/Under 2.5
+              const totalGoals = home + away;
+              if (selections.goals === 'over') {
+                if (!(totalGoals >= 3)) won = false;
+              } else if (selections.goals === 'under') {
+                if (!(totalGoals <= 2)) won = false;
+              }
+
+              // BTTS
+              if (selections.btts === 'yes') {
+                if (!(home > 0 && away > 0)) won = false;
+              } else if (selections.btts === 'no') {
+                if (home > 0 && away > 0) won = false;
+              }
+
+              const amountWon = won ? Number(bet) * combinedOdds : 0;
+              const resultText = won
+                ? `Vitória ${home}x${away}`
+                : `Derrota ${home}x${away}`;
+
+              settleBet(id, amountWon, resultText);
+
+              if (won) {
+                setStatus(`Vitória! Placar final ${home} x ${away}`);
+                sfx(hackSettings, 'win');
+              } else {
+                setStatus(`Derrota. Placar final ${home} x ${away}`);
+                sfx(hackSettings, 'lose');
+              }
+
+              try { ws.close(); } catch (e) {}
+            }
+          } catch (err) {
+            console.error('Erro ao processar mensagem do WebSocket:', err);
+          }
+        };
+
+        ws.onerror = () => {
+          setStatus('Erro de conexão com o servidor.');
+          setBusy(false);
+        };
+
+        ws.onclose = () => {
+          if (!finished) setBusy(false);
+        };
+      };
 
       return (
         <div className="football-wrap">
