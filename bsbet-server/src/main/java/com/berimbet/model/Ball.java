@@ -10,41 +10,32 @@ public class Ball {
 
     public void updatePhysics() {
         if (owner != null) {
-            double offsetX = owner.getTeam() == Enums.TeamSide.HOME ? 1.4 : -1.4;
-            this.position.x = owner.getPosition().x + offsetX;
-            this.position.y = owner.getPosition().y;
-            this.velocity.x = 0;
-            this.velocity.y = 0;
+            double offsetX = owner.getTeam() == Enums.TeamSide.HOME ? 1.35 : -1.35;
+            position.x = owner.getPosition().x + offsetX;
+            position.y = owner.getPosition().y;
+            velocity.x = 0;
+            velocity.y = 0;
             return;
         }
+        position.add(velocity);
+        velocity.mult(0.93);
 
-        this.position.add(this.velocity);
-        this.velocity.mult(0.935);
+        if (position.y <= 2) { position.y = 2; velocity.y *= -0.7; }
+        if (position.y >= 98) { position.y = 98; velocity.y *= -0.7; }
 
-        // Laterais
-        if (this.position.y <= 2) { this.position.y = 2; this.velocity.y *= -0.72; }
-        if (this.position.y >= 98) { this.position.y = 98; this.velocity.y *= -0.72; }
+        boolean outsideMouth = position.y < 39 || position.y > 61;
+        if (position.x <= 1.4 && outsideMouth) { position.x = 1.4; velocity.x *= -0.7; }
+        if (position.x >= 98.6 && outsideMouth) { position.x = 98.6; velocity.x *= -0.7; }
 
-        // Fundo — fora do gol rebate; dentro do gol passa (gol detectado no engine)
-        boolean outsideGoalMouth = this.position.y < 39 || this.position.y > 61;
-        if (this.position.x <= 1.5 && outsideGoalMouth) {
-            this.position.x = 1.5;
-            this.velocity.x *= -0.72;
-        }
-        if (this.position.x >= 98.5 && outsideGoalMouth) {
-            this.position.x = 98.5;
-            this.velocity.x *= -0.72;
-        }
-
-        if (this.velocity.mag() < 0.04) {
-            this.velocity.x = 0;
-            this.velocity.y = 0;
+        if (velocity.mag() < 0.045) {
+            velocity.x = 0;
+            velocity.y = 0;
         }
     }
 
     public void kick(Vector2D force) {
-        this.owner = null;
-        this.velocity.x = force.x;
-        this.velocity.y = force.y;
+        owner = null;
+        velocity.x = force.x;
+        velocity.y = force.y;
     }
 }

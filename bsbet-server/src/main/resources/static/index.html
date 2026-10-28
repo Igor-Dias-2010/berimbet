@@ -8235,7 +8235,7 @@
         const step = () => {
           const t = targetRef.current;
           const v = visualRef.current;
-          const lerp = 0.22; // 0–1 por frame; ~fluido a 60fps com updates lentos
+          const lerp = 0.32; // acompanha jogo mais rápido sem “borracha”
           if (t.players && v.players && t.players.length === v.players.length) {
             for (let i = 0; i < t.players.length; i++) {
               v.players[i].x += (t.players[i].x - v.players[i].x) * lerp;
@@ -8464,8 +8464,13 @@
                     el.dataset.ready = '1';
                   }
                 }}
-                className={cn('football-player', p.team === 0 ? 'home' : 'away', p.role === 0 && 'gk')}
+                className={cn(
+                  'football-player',
+                  p.team === 0 ? 'home' : 'away',
+                  p.role === 0 ? 'gk' : p.role === 1 ? 'def' : p.role === 2 ? 'mid' : 'fwd'
+                )}
                 data-n={(i % 11) + 1}
+                title={p.role === 0 ? 'Goleiro' : p.role === 1 ? 'Zagueiro' : p.role === 2 ? 'Meia' : 'Atacante'}
               />
             ))}
             <span
@@ -11629,49 +11634,106 @@
       z-index: 0;
     }
 
-    /* Lobos — ouro / âmbar */
+    /* Lobos (linha) — ouro */
     .football-player.home {
       background:
         radial-gradient(circle at 32% 28%, rgba(255, 255, 255, .65) 0%, transparent 42%),
-        radial-gradient(circle at 70% 75%, rgba(0, 0, 0, .18) 0%, transparent 50%),
         linear-gradient(160deg, #ffe08a 0%, #e0b84a 40%, #b8860b 78%, #7a5a08 100%);
       color: #1c1400;
       text-shadow: 0 1px 0 rgba(255, 255, 255, .4);
       border-color: #5c4508;
     }
-
-    /* Dragões — azul royal */
+    /* Dragões (linha) — azul */
     .football-player.away {
       background:
         radial-gradient(circle at 32% 28%, rgba(255, 255, 255, .5) 0%, transparent 42%),
-        radial-gradient(circle at 70% 75%, rgba(0, 0, 0, .25) 0%, transparent 50%),
         linear-gradient(160deg, #6ea8fe 0%, #2563eb 42%, #1e3a8a 78%, #0f172a 100%);
       color: #f8fafc;
       border-color: #0b1e45;
     }
 
-    /* Goleiro — maior + aro branco */
+    /* Zagueiro: um pouco mais escuro / “sólido” */
+    .football-player.home.def {
+      background:
+        radial-gradient(circle at 32% 28%, rgba(255, 255, 255, .5) 0%, transparent 42%),
+        linear-gradient(160deg, #e8c96a 0%, #c4a035 45%, #8a6a10 100%);
+    }
+    .football-player.away.def {
+      background:
+        radial-gradient(circle at 32% 28%, rgba(255, 255, 255, .4) 0%, transparent 42%),
+        linear-gradient(160deg, #4b7fd4 0%, #1d4ed8 50%, #0c1a4a 100%);
+    }
+
+    /* Meia: brilho médio */
+    .football-player.home.mid {
+      background:
+        radial-gradient(circle at 32% 28%, rgba(255, 255, 255, .7) 0%, transparent 42%),
+        linear-gradient(160deg, #ffe9a8 0%, #e8c04a 42%, #b8920e 100%);
+    }
+    .football-player.away.mid {
+      background:
+        radial-gradient(circle at 32% 28%, rgba(255, 255, 255, .55) 0%, transparent 42%),
+        linear-gradient(160deg, #7eb6ff 0%, #3b82f6 45%, #1e3a8a 100%);
+    }
+
+    /* Atacante: anel interno mais claro + levemente maior */
+    .football-player.fwd {
+      width: 21px;
+      height: 21px;
+      font-size: 8.5px;
+    }
+    .football-player.home.fwd {
+      background:
+        radial-gradient(circle at 32% 28%, rgba(255, 255, 255, .75) 0%, transparent 42%),
+        linear-gradient(160deg, #fff3c4 0%, #f0c94a 40%, #d4a017 100%);
+      box-shadow:
+        inset 0 2px 3px rgba(255, 255, 255, .6),
+        inset 0 -3px 4px rgba(0, 0, 0, .25),
+        0 0 0 1.5px rgba(255, 220, 120, .5),
+        0 2px 4px rgba(0, 0, 0, .4);
+    }
+    .football-player.away.fwd {
+      background:
+        radial-gradient(circle at 32% 28%, rgba(255, 255, 255, .6) 0%, transparent 42%),
+        linear-gradient(160deg, #93c5fd 0%, #3b82f6 40%, #1e40af 100%);
+      box-shadow:
+        inset 0 2px 3px rgba(255, 255, 255, .55),
+        inset 0 -3px 4px rgba(0, 0, 0, .28),
+        0 0 0 1.5px rgba(147, 197, 253, .45),
+        0 2px 4px rgba(0, 0, 0, .4);
+    }
+
+    /* GOLEIRO — cor diferente (kit clássico verde / roxo), maior, aro branco */
     .football-player.gk {
-      width: 23px;
-      height: 23px;
-      font-size: 7px;
+      width: 24px;
+      height: 24px;
+      font-size: 8px;
       z-index: 6;
+      border-width: 2.5px;
       box-shadow:
         inset 0 2px 3px rgba(255, 255, 255, .55),
         inset 0 -3px 4px rgba(0, 0, 0, .3),
-        0 0 0 2.5px #f1f5f9,
-        0 0 0 3.5px rgba(15, 23, 42, .45),
-        0 2px 5px rgba(0, 0, 0, .45);
+        0 0 0 2.5px #f8fafc,
+        0 0 0 4px rgba(15, 23, 42, .5),
+        0 2px 6px rgba(0, 0, 0, .5);
     }
+    /* GK Lobos = verde (não dourado) */
     .football-player.home.gk {
       background:
-        radial-gradient(circle at 32% 28%, rgba(255, 255, 255, .7) 0%, transparent 42%),
-        linear-gradient(160deg, #fff6d6 0%, #f0d060 45%, #c9a227 100%);
+        radial-gradient(circle at 32% 28%, rgba(255, 255, 255, .65) 0%, transparent 42%),
+        linear-gradient(160deg, #86efac 0%, #22c55e 40%, #15803d 78%, #14532d 100%);
+      color: #052e16;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, .35);
+      border-color: #14532d;
     }
+    /* GK Dragões = roxo/magenta (não azul de linha) */
     .football-player.away.gk {
       background:
         radial-gradient(circle at 32% 28%, rgba(255, 255, 255, .55) 0%, transparent 42%),
-        linear-gradient(160deg, #bfdbfe 0%, #3b82f6 45%, #1e40af 100%);
+        linear-gradient(160deg, #e9d5ff 0%, #a855f7 40%, #7e22ce 78%, #4c1d95 100%);
+      color: #faf5ff;
+      text-shadow: 0 1px 1px rgba(0, 0, 0, .45);
+      border-color: #4c1d95;
     }
 
     /* Bola — botão redondo branco com manchas */
