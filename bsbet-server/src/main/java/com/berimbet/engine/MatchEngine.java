@@ -4,14 +4,16 @@ import com.berimbet.model.*;
 import lombok.Getter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.function.BiConsumer;
 
 /**
- * Motor 4-3-3 — ritmo de partida real (rápido de assistir, decisões claras).
- * Física 24 Hz · rede ~12 Hz · cliente interpola.
+ * Motor com formações reais embutidas (sem classe extra):
+ * 4-3-3, 4-4-2, 4-2-3-1, 3-5-2, 3-4-3 — uma sorteada por partida.
  */
 public class MatchEngine implements Runnable {
     @Getter private final String matchId;
+    @Getter private final String formationLabel;
     @Getter private final List<Player> players = new ArrayList<>();
     @Getter private final Ball ball = new Ball();
     @Getter private int homeScore = 0, awayScore = 0, matchMinute = 0;
@@ -24,9 +26,96 @@ public class MatchEngine implements Runnable {
 
     private static final double TICKS_PER_SEC = 24.0;
     private static final double NS_PER_TICK = 1_000_000_000.0 / TICKS_PER_SEC;
-    private static final int SEND_EVERY = 2; // ~12 updates/s
-    /** ~0.55 s real por minuto de jogo → 90' ≈ 50 s (ou termina em 2 gols) */
+    private static final int SEND_EVERY = 2;
     private static final double REAL_SECONDS_PER_MATCH_MINUTE = 0.55;
+    private static final Random RNG = new Random();
+
+    // ── Formações: label, posições HOME [11][2], roles[11], shirts[11] ──
+    private static final Object[][] FORMATIONS = {
+        {
+            "4-3-3",
+            new double[][]{
+                {3.5, 50},
+                {20, 82}, {16, 61}, {16, 39}, {20, 18},
+                {40, 68}, {36, 50}, {40, 32},
+                {62, 80}, {68, 50}, {62, 20}
+            },
+            new Enums.PlayerRole[]{
+                Enums.PlayerRole.GOALKEEPER,
+                Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER,
+                Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER,
+                Enums.PlayerRole.FORWARD, Enums.PlayerRole.FORWARD, Enums.PlayerRole.FORWARD
+            },
+            new int[]{1, 2, 5, 6, 3, 8, 4, 10, 7, 9, 11}
+        },
+        {
+            "4-4-2",
+            new double[][]{
+                {3.5, 50},
+                {20, 82}, {16, 60}, {16, 40}, {20, 18},
+                {42, 82}, {40, 60}, {40, 40}, {42, 18},
+                {66, 60}, {66, 40}
+            },
+            new Enums.PlayerRole[]{
+                Enums.PlayerRole.GOALKEEPER,
+                Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER,
+                Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER,
+                Enums.PlayerRole.FORWARD, Enums.PlayerRole.FORWARD
+            },
+            new int[]{1, 2, 5, 6, 3, 7, 4, 8, 11, 9, 10}
+        },
+        {
+            "4-2-3-1",
+            new double[][]{
+                {3.5, 50},
+                {20, 82}, {16, 60}, {16, 40}, {20, 18},
+                {34, 62}, {34, 38},
+                {52, 80}, {52, 50}, {52, 20},
+                {70, 50}
+            },
+            new Enums.PlayerRole[]{
+                Enums.PlayerRole.GOALKEEPER,
+                Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER,
+                Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER,
+                Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER,
+                Enums.PlayerRole.FORWARD
+            },
+            new int[]{1, 2, 5, 6, 3, 4, 8, 7, 10, 11, 9}
+        },
+        {
+            "3-5-2",
+            new double[][]{
+                {3.5, 50},
+                {16, 70}, {14, 50}, {16, 30},
+                {36, 88}, {38, 65}, {36, 50}, {38, 35}, {36, 12},
+                {66, 58}, {66, 42}
+            },
+            new Enums.PlayerRole[]{
+                Enums.PlayerRole.GOALKEEPER,
+                Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER,
+                Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER,
+                Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER,
+                Enums.PlayerRole.FORWARD, Enums.PlayerRole.FORWARD
+            },
+            new int[]{1, 4, 5, 6, 2, 8, 10, 7, 3, 9, 11}
+        },
+        {
+            "3-4-3",
+            new double[][]{
+                {3.5, 50},
+                {16, 70}, {14, 50}, {16, 30},
+                {40, 82}, {38, 60}, {38, 40}, {40, 18},
+                {64, 80}, {68, 50}, {64, 20}
+            },
+            new Enums.PlayerRole[]{
+                Enums.PlayerRole.GOALKEEPER,
+                Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER,
+                Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER,
+                Enums.PlayerRole.FORWARD, Enums.PlayerRole.FORWARD, Enums.PlayerRole.FORWARD
+            },
+            new int[]{1, 4, 5, 6, 2, 8, 10, 3, 7, 9, 11}
+        }
+    };
 
     public MatchEngine(String matchId, Runnable onTickCallback, Runnable onMatchEndCallback,
                        BiConsumer<String, MatchEngine> onEventCallback) {
@@ -34,33 +123,19 @@ public class MatchEngine implements Runnable {
         this.onTickCallback = onTickCallback;
         this.onMatchEndCallback = onMatchEndCallback;
         this.onEventCallback = onEventCallback;
-        setupTeams();
+        Object[] f = FORMATIONS[RNG.nextInt(FORMATIONS.length)];
+        this.formationLabel = (String) f[0];
+        setupTeams((double[][]) f[1], (Enums.PlayerRole[]) f[2], (int[]) f[3]);
     }
 
-    private void setupTeams() {
-        // 4-3-3 (IFAB / uso comum em clubes modernos)
-        double[][] homeForm = {
-            {6, 50},
-            {20, 16}, {20, 36}, {20, 64}, {20, 84},
-            {40, 26}, {40, 50}, {40, 74},
-            {62, 20}, {66, 50}, {62, 80}
-        };
-        double[][] awayForm = {
-            {94, 50},
-            {80, 16}, {80, 36}, {80, 64}, {80, 84},
-            {60, 26}, {60, 50}, {60, 74},
-            {38, 20}, {34, 50}, {38, 80}
-        };
-        Enums.PlayerRole[] roles = {
-            Enums.PlayerRole.GOALKEEPER,
-            Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER,
-            Enums.PlayerRole.DEFENDER, Enums.PlayerRole.DEFENDER,
-            Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER, Enums.PlayerRole.MIDFIELDER,
-            Enums.PlayerRole.FORWARD, Enums.PlayerRole.FORWARD, Enums.PlayerRole.FORWARD
-        };
+    private void setupTeams(double[][] home, Enums.PlayerRole[] roles, int[] shirts) {
         for (int i = 0; i < 11; i++) {
-            players.add(new Player(i, Enums.TeamSide.HOME, roles[i], new Vector2D(homeForm[i][0], homeForm[i][1])));
-            players.add(new Player(i + 11, Enums.TeamSide.AWAY, roles[i], new Vector2D(awayForm[i][0], awayForm[i][1])));
+            double ax = 100.0 - home[i][0];
+            double ay = 100.0 - home[i][1];
+            players.add(new Player(i, Enums.TeamSide.HOME, roles[i], i, shirts[i],
+                new Vector2D(home[i][0], home[i][1])));
+            players.add(new Player(i + 11, Enums.TeamSide.AWAY, roles[i], i, shirts[i],
+                new Vector2D(ax, ay)));
         }
     }
 
@@ -75,13 +150,15 @@ public class MatchEngine implements Runnable {
 
     @Override
     public void run() {
+        if (onEventCallback != null) {
+            onEventCallback.accept("Formação: " + formationLabel, this);
+        }
         long lastTime = System.nanoTime();
         double delta = 0;
         while (isRunning) {
             long now = System.nanoTime();
             delta += (now - lastTime) / NS_PER_TICK;
             lastTime = now;
-
             int steps = 0;
             while (delta >= 1 && isRunning && steps < 3) {
                 tick();
@@ -94,7 +171,6 @@ public class MatchEngine implements Runnable {
                 }
             }
             if (delta > 3) delta = 0;
-
             try {
                 Thread.sleep(28);
             } catch (InterruptedException e) {
@@ -106,7 +182,6 @@ public class MatchEngine implements Runnable {
 
     private void tick() {
         if (isGoalCelebration) return;
-
         ticks++;
         matchMinute = Math.min(90, (int) (ticks / TICKS_PER_SEC / REAL_SECONDS_PER_MATCH_MINUTE));
 
@@ -127,11 +202,24 @@ public class MatchEngine implements Runnable {
     }
 
     private void checkBallCollision(Player p) {
-        if (ball.getOwner() == null
-                && p.getPosition().distance(ball.getPosition()) < 2.5
-                && p.getCooldownTicks() == 0) {
-            ball.setOwner(p);
+        if (ball.getOwner() != null) return;
+        if (p.getCooldownTicks() > 0) return;
+        if (p.getPosition().distance(ball.getPosition()) >= 2.5) return;
+
+        if (p.getRole() == Enums.PlayerRole.GOALKEEPER) {
+            if (p.isInOwnPenaltyArea(ball.getPosition())) {
+                ball.setOwner(p);
+            }
+            return;
         }
+        if (isInGoalMouth(p.getPosition(), p.getTeam())) return;
+        ball.setOwner(p);
+    }
+
+    public boolean isInGoalMouth(Vector2D pos, Enums.TeamSide team) {
+        if (pos.y < 36 || pos.y > 64) return false;
+        if (team == Enums.TeamSide.HOME) return pos.x < 9;
+        return pos.x > 91;
     }
 
     private void checkGoals() {
@@ -206,20 +294,15 @@ public class MatchEngine implements Runnable {
         for (Player p : players) {
             if (p.getTeam() != passer.getTeam() || p == passer) continue;
             if (p.getRole() == Enums.PlayerRole.GOALKEEPER) continue;
-
             double dist = p.getPosition().distance(passer.getPosition());
             if (dist < 5 || dist > 42) continue;
-
             double progress = (p.getPosition().x - passer.getPosition().x) * attackDir;
             double distToGoal = Math.abs(p.getPosition().x - goalX);
             double score = progress * 2.8 + (100 - distToGoal) * 0.4 - dist * 0.35;
-
             if (p.getRole() == Enums.PlayerRole.FORWARD) score += 10;
             if (p.getRole() == Enums.PlayerRole.FORWARD && distToGoal < 22) score += 14;
             if (p.getRole() == Enums.PlayerRole.MIDFIELDER) score += 5;
-            // penaliza passe lateral puro
             if (progress < 2 && dist > 15) score -= 8;
-
             if (score > bestScore) {
                 bestScore = score;
                 best = p;

@@ -8184,16 +8184,23 @@
       const selectedBtts = markets.btts.find(x => x[0] === selections.btts) || markets.btts[0];
       const combinedOdds = selectedResult[2] * selectedGoals[2] * selectedBtts[2];
 
+      // 4-3-3 clássico + números tradicionais (1 GK, 2 RB, 5 RCB, 6 LCB, 3 LB, 8 RCM, 4 CDM, 10 LCM, 7 RW, 9 ST, 11 LW)
       const ROLE = [0, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3];
+      const SHIRT = [1, 2, 5, 6, 3, 8, 4, 10, 7, 9, 11];
       const playerHome = [
-        [7, 50], [20, 20], [20, 40], [20, 60], [20, 80], [34, 25], [34, 50], [34, 75], [46, 25], [46, 50], [46, 75]
+        [3.5, 50], [20, 82], [16, 61], [16, 39], [20, 18],
+        [40, 68], [36, 50], [40, 32], [62, 80], [68, 50], [62, 20]
       ];
       const playerAway = [
-        [93, 50], [80, 20], [80, 40], [80, 60], [80, 80], [66, 25], [66, 50], [66, 75], [54, 25], [54, 50], [54, 75]
+        [96.5, 50], [80, 18], [84, 39], [84, 61], [80, 82],
+        [60, 32], [64, 50], [60, 68], [38, 20], [32, 50], [38, 80]
       ];
 
       const makePlayers = () => playerHome.concat(playerAway).map((p, i) => ({
-        x: p[0], y: p[1], homeX: p[0], homeY: p[1], team: i < 11 ? 0 : 1, role: ROLE[i % 11]
+        x: p[0], y: p[1], homeX: p[0], homeY: p[1],
+        team: i < 11 ? 0 : 1,
+        role: ROLE[i % 11],
+        n: SHIRT[i % 11]
       }));
 
       // Estado alvo (servidor) + estado visual (interpolado) para movimento fluido
@@ -8469,8 +8476,8 @@
                   p.team === 0 ? 'home' : 'away',
                   p.role === 0 ? 'gk' : p.role === 1 ? 'def' : p.role === 2 ? 'mid' : 'fwd'
                 )}
-                data-n={(i % 11) + 1}
-                title={p.role === 0 ? 'Goleiro' : p.role === 1 ? 'Zagueiro' : p.role === 2 ? 'Meia' : 'Atacante'}
+                data-n={p.n != null ? p.n : SHIRT[i % 11]}
+                title={p.role === 0 ? 'Goleiro #1' : p.role === 1 ? 'Zagueiro' : p.role === 2 ? 'Meia' : 'Atacante'}
               />
             ))}
             <span

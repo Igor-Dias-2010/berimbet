@@ -9,20 +9,19 @@ import java.util.List;
 @Data
 public class MatchStateDTO {
     private String type = "STATE";
+    private String formation;
     private int minute;
     private int[] score;
     private BallDTO ball;
     private List<PlayerDTO> players;
 
     public MatchStateDTO(MatchEngine engine) {
+        this.formation = engine.getFormationLabel();
         this.minute = engine.getMatchMinute();
         this.score = new int[]{engine.getHomeScore(), engine.getAwayScore()};
-
         double bx = engine.getBall().getPosition().x;
         double by = engine.getBall().getPosition().y;
-        // 1 casa decimal → JSON menor e estável
         this.ball = new BallDTO(round1(bx), round1(by));
-
         List<Player> src = engine.getPlayers();
         this.players = new ArrayList<>(src.size());
         for (Player p : src) {
@@ -42,11 +41,13 @@ public class MatchStateDTO {
 
     @Data
     public static class PlayerDTO {
-        private int id, team;
+        private int id, team, n, role;
         private double x, y;
         public PlayerDTO(Player p) {
             this.id = p.getId();
             this.team = p.getTeam().ordinal();
+            this.n = p.getShirtNumber();
+            this.role = p.getRole().ordinal();
             this.x = Math.round(p.getPosition().x * 10.0) / 10.0;
             this.y = Math.round(p.getPosition().y * 10.0) / 10.0;
         }

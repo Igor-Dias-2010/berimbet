@@ -4,12 +4,20 @@ import com.berimbet.engine.MatchEngine;
 import lombok.Data;
 
 /**
- * IA por posição (4-3-3), decisões no estilo de jogo real:
- * posse → progresso; sem bola → forma + pressão seletiva; GK preso na área.
+ * Comportamento por posição no 4-3-3 (IFAB + prática de jogo real).
+ *
+ * slot: 0=GK 1=RB 2=RCB 3=LCB 4=LB 5=RCM 6=CDM 7=LCM 8=RW 9=ST 10=LW
+ *
+ * GK: fica NA LINHA DO GOL; só sai dentro da área do gol (6 jardas / 5,5 m)
+ *     para bola solta muito perto — nunca vaga pela área penal inteira.
+ * DEF: linha defensiva; proibido estacionar na boca do gol.
  */
 @Data
 public class Player {
     private int id;
+    private int shirtNumber;
+    /** Índice tático 0–10 dentro do 4-3-3 */
+    private int slot;
     private Enums.TeamSide team;
     private Enums.PlayerRole role;
     private Enums.PlayerState state;
@@ -20,15 +28,20 @@ public class Player {
     private static final double SPEED_SCALE = 0.58;
     private static final double ACCEL_SCALE = 0.55;
 
-    /** Área penal (aprox. 16.5 m em campo 100u) */
-    private static final double BOX_DEPTH = 16.5;
-    private static final double BOX_Y_MIN = 21;
-    private static final double BOX_Y_MAX = 79;
+    /** IFAB: área penal 16,5 m; área do gol 5,5 m (campo normalizado 0–100) */
+    private static final double PENALTY_DEPTH = 16.5;
+    private static final double GOAL_AREA_DEPTH = 5.5;
+    private static final double PENALTY_Y_MIN = 20;
+    private static final double PENALTY_Y_MAX = 80;
+    private static final double GOAL_MOUTH_Y_MIN = 39;
+    private static final double GOAL_MOUTH_Y_MAX = 61;
 
-    public Player(int id, Enums.TeamSide team, Enums.PlayerRole role, Vector2D startPos) {
+    public Player(int id, Enums.TeamSide team, Enums.PlayerRole role, int slot, int shirtNumber, Vector2D startPos) {
         this.id = id;
         this.team = team;
         this.role = role;
+        this.slot = slot;
+        this.shirtNumber = shirtNumber;
         this.homePosition = new Vector2D(startPos.x, startPos.y);
         this.position = new Vector2D(startPos.x, startPos.y);
         this.velocity = new Vector2D(0, 0);
@@ -40,37 +53,37 @@ public class Player {
         if (cooldownTicks > 0) {
             cooldownTicks--;
             applyFriction();
-            this.position.add(this.velocity);
-            keepInBounds();
+            position.add(velocity);
+            keepInBounds(engine);
             return;
         }
         decideState(engine, closestHome, closestAway);
         executeRole(engine);
-        this.position.add(this.velocity);
+        position.add(velocity);
         applyFriction();
-        keepInBounds();
+        keepInBounds(engine);
     }
 
     private void decideState(MatchEngine engine, Player closestHome, Player closestAway) {
         Ball ball = engine.getBall();
         if (role == Enums.PlayerRole.GOALKEEPER) {
-            this.state = Enums.PlayerState.IDLE;
+            state = Enums.PlayerState.IDLE;
             return;
         }
         if (ball.getOwner() == this) {
-            this.state = Enums.PlayerState.WITH_BALL;
+            state = Enums.PlayerState.WITH_BALL;
             return;
         }
-        if (ball.getOwner() != null && ball.getOwner().getTeam() == this.team) {
-            this.state = Enums.PlayerState.SUPPORTING;
+        if (ball.getOwner() != null && ball.getOwner().getTeam() == team) {
+            state = Enums.PlayerState.SUPPORTING;
             return;
         }
         if (ball.getOwner() != null) {
-            this.state = Enums.PlayerState.DEFENDING;
+            state = Enums.PlayerState.DEFENDING;
             return;
         }
         Player closest = team == Enums.TeamSide.HOME ? closestHome : closestAway;
-        this.state = (closest == this) ? Enums.PlayerState.SUPPORTING : Enums.PlayerState.IDLE;
+        state = (closest == this) ? Enums.PlayerState.SUPPORTING : Enums.PlayerState.IDLE;
     }
 
     private void executeRole(MatchEngine engine) {
@@ -83,51 +96,58 @@ public class Player {
         }
     }
 
-    // ───────── GOLEIRO: nunca sai da área ─────────
+    // ═══════════════════════════════════════════════════════════
+    // GOLEIRO — posição base = LINHA DO GOL (como em cobrança de pênalti IFAB)
+    // Só avança dentro da ÁREA DO GOL (5,5 m) se a bola estiver solta e perto.
+    // ═══════════════════════════════════════════════════════════
     private void behaveGoalkeeper(MatchEngine engine) {
         Ball ball = engine.getBall();
-        double goalX = team == Enums.TeamSide.HOME ? 5.5 : 94.5;
-        double boxEdge = team == Enums.TeamSide.HOME ? BOX_DEPTH : 100 - BOX_DEPTH;
+        double goalLineX = team == Enums.TeamSide.HOME ? 3.0 : 97.0;
 
         if (ball.getOwner() == this) {
-            // Saída rápida: lateral ou longo
-            double ty = 25 + Math.random() * 50;
-            double tx = team == Enums.TeamSide.HOME ? (Math.random() < 0.55 ? 42 : 55) : (Math.random() < 0.55 ? 58 : 45);
+            // Reposição: lateral ou longo (construção)
+            double ty = 28 + Math.random() * 44;
+            double tx = team == Enums.TeamSide.HOME
+                ? (Math.random() < 0.5 ? 38 : 52)
+                : (Math.random() < 0.5 ? 62 : 48);
             Vector2D dir = Vector2D.sub(new Vector2D(tx, ty), position);
             dir.normalize();
-            dir.mult(2.0 + attributes.getPassing() * 0.5);
+            dir.mult(2.1 + attributes.getPassing() * 0.45);
             ball.kick(dir);
             cooldownTicks = 10;
             return;
         }
 
-        double targetY = clamp(ball.getPosition().y, 38, 62);
-        double targetX = goalX;
+        double ballY = clamp(ball.getPosition().y, GOAL_MOUTH_Y_MIN, GOAL_MOUTH_Y_MAX);
+        // Fecha o ângulo: mistura bola com centro do gol
+        double targetY = clamp(ballY * 0.55 + 50 * 0.45, 42, 58);
 
-        // Só avança dentro da área se bola estiver nela e perigosa
-        boolean ballInBox = isInOwnBox(ball.getPosition());
+        boolean ballInGoalArea = isInOwnGoalArea(ball.getPosition());
         double distBall = position.distance(ball.getPosition());
-        if (ballInBox && ball.getOwner() == null && distBall < 14) {
-            targetX = clamp(ball.getPosition().x,
-                team == Enums.TeamSide.HOME ? 2 : boxEdge,
-                team == Enums.TeamSide.HOME ? boxEdge : 98);
-            targetY = clamp(ball.getPosition().y, BOX_Y_MIN + 2, BOX_Y_MAX - 2);
-            steerTowards(new Vector2D(targetX, targetY), attributes.getSpeed() * SPEED_SCALE * 1.15);
-            if (distBall < 2.4) ball.setOwner(this);
+
+        // Sai da linha SÓ se bola está na área do gol, solta, e a < ~8 u
+        if (ballInGoalArea && ball.getOwner() == null && distBall < 8) {
+            double maxX = team == Enums.TeamSide.HOME ? GOAL_AREA_DEPTH : 100 - GOAL_AREA_DEPTH;
+            double minX = team == Enums.TeamSide.HOME ? 2.0 : 100 - GOAL_AREA_DEPTH;
+            double tx = clamp(ball.getPosition().x, Math.min(minX, maxX), Math.max(minX, maxX));
+            double ty = clamp(ball.getPosition().y, 36, 64);
+            steerTowards(new Vector2D(tx, ty), attributes.getSpeed() * SPEED_SCALE * 1.2);
+            if (distBall < 2.3) ball.setOwner(this);
             return;
         }
 
-        // Posicionamento: fecha ângulo (entre bola e centro do gol)
-        double blend = 0.35;
-        targetY = clamp(ball.getPosition().y * blend + 50 * (1 - blend), 40, 60);
-        steerTowards(new Vector2D(goalX, targetY), attributes.getSpeed() * SPEED_SCALE);
+        // Posição padrão: NA LINHA DO GOL, acompanhando o Y
+        steerTowards(new Vector2D(goalLineX, targetY), attributes.getSpeed() * SPEED_SCALE * 0.95);
     }
 
-    // ───────── ZAGA: linha + marcação ─────────
+    // ═══════════════════════════════════════════════════════════
+    // ZAGA — 2=RB, 5=RCB, 6=LCB, 3=LB
+    // Nunca estaciona na boca do gol (isso é função do goleiro).
+    // ═══════════════════════════════════════════════════════════
     private void behaveDefender(MatchEngine engine) {
         Ball ball = engine.getBall();
         double spd = attributes.getSpeed() * SPEED_SCALE * 0.95;
-        double maxX = team == Enums.TeamSide.HOME ? 54 : 46;
+        boolean fullback = (slot == 1 || slot == 4); // RB / LB
 
         if (state == Enums.PlayerState.WITH_BALL) {
             playWithBall(engine, false);
@@ -139,12 +159,13 @@ public class Player {
             Vector2D mark;
             if (threat != null) {
                 double goalX = team == Enums.TeamSide.HOME ? 0 : 100;
+                // Entre o atacante e o gol, sem entrar na boca
                 mark = new Vector2D(
-                    threat.getPosition().x * 0.6 + goalX * 0.4,
-                    threat.getPosition().y * 0.65 + homePosition.y * 0.35
+                    threat.getPosition().x * 0.55 + goalX * 0.2 + homePosition.x * 0.25,
+                    threat.getPosition().y * 0.6 + homePosition.y * 0.4
                 );
             } else {
-                mark = defensiveLine(ball);
+                mark = defensiveLinePos(ball, fullback);
             }
             if (ball.getOwner() != null && position.distance(ball.getOwner().getPosition()) < 2.8
                     && Math.random() < attributes.getTackling() * 0.09) {
@@ -152,120 +173,111 @@ public class Player {
                 ball.setOwner(this);
                 return;
             }
-            if (team == Enums.TeamSide.HOME && mark.x > maxX) mark.x = maxX;
-            if (team == Enums.TeamSide.AWAY && mark.x < maxX) mark.x = maxX;
+            mark = clampAwayFromGoalMouth(mark);
             steerTowards(mark, spd);
             return;
         }
 
         if (state == Enums.PlayerState.SUPPORTING && ball.getOwner() == null) {
-            boolean ownHalf = team == Enums.TeamSide.HOME ? ball.getPosition().x < 52 : ball.getPosition().x > 48;
-            if (ownHalf) {
-                steerTowards(ball.getPosition(), spd * 1.1);
+            boolean ownHalf = team == Enums.TeamSide.HOME
+                ? ball.getPosition().x < 52 : ball.getPosition().x > 48;
+            if (ownHalf && !engine.isInGoalMouth(ball.getPosition(), team)) {
+                steerTowards(ball.getPosition(), spd * 1.05);
                 return;
             }
         }
 
-        Vector2D shape = defensiveLine(ball);
-        if (team == Enums.TeamSide.HOME && shape.x > maxX) shape.x = maxX;
-        if (team == Enums.TeamSide.AWAY && shape.x < maxX) shape.x = maxX;
+        Vector2D shape = clampAwayFromGoalMouth(defensiveLinePos(ball, fullback));
         steerTowards(shape, spd * 0.8);
     }
 
-    // ───────── MEIO: ligação + pressão ─────────
     private void behaveMidfielder(MatchEngine engine) {
         Ball ball = engine.getBall();
         double spd = attributes.getSpeed() * SPEED_SCALE;
+        boolean cdm = (slot == 6);
 
         if (state == Enums.PlayerState.WITH_BALL) {
-            playWithBall(engine, true);
+            playWithBall(engine, !cdm);
             return;
         }
-
         if (state == Enums.PlayerState.DEFENDING) {
             if (ball.getOwner() != null) {
                 double d = position.distance(ball.getOwner().getPosition());
-                if (d < 20) {
+                if (d < (cdm ? 22 : 18)) {
                     if (d < 2.7 && Math.random() < attributes.getTackling() * 0.08) {
                         ball.getOwner().setCooldownTicks(14);
                         ball.setOwner(this);
                         return;
                     }
-                    steerTowards(ball.getOwner().getPosition(), spd);
+                    steerTowards(ball.getOwner().getPosition(), spd * (cdm ? 0.95 : 1.0));
                     return;
                 }
             }
             Vector2D cover = new Vector2D(
-                homePosition.x * 0.4 + ball.getPosition().x * 0.6,
+                homePosition.x * 0.45 + ball.getPosition().x * 0.55,
                 homePosition.y * 0.55 + ball.getPosition().y * 0.45
             );
             steerTowards(cover, spd * 0.85);
             return;
         }
-
         if (state == Enums.PlayerState.SUPPORTING) {
             if (ball.getOwner() == null) {
                 steerTowards(ball.getPosition(), spd * 1.05);
                 return;
             }
             Player owner = ball.getOwner();
-            double ahead = team == Enums.TeamSide.HOME ? 12 : -12;
-            double side = homePosition.y < 50 ? -11 : 11;
+            double ahead = team == Enums.TeamSide.HOME ? 11 : -11;
+            if (cdm) ahead *= 0.4;
+            double side = homePosition.y < 50 ? -10 : 10;
             Vector2D support = new Vector2D(
                 clamp(owner.getPosition().x + ahead, 14, 86),
-                clamp(owner.getPosition().y + side * 0.45, 10, 90)
+                clamp(owner.getPosition().y + side * 0.4, 10, 90)
             );
-            support.x = support.x * 0.6 + homePosition.x * 0.4;
-            support.y = support.y * 0.55 + homePosition.y * 0.45;
+            support.x = support.x * 0.55 + homePosition.x * 0.45;
+            support.y = support.y * 0.5 + homePosition.y * 0.5;
             steerTowards(support, spd * 0.9);
             return;
         }
-
         holdShape(0.6);
     }
 
-    // ───────── ATAQUE: profundidade + finalização ─────────
     private void behaveForward(MatchEngine engine) {
         Ball ball = engine.getBall();
         double spd = attributes.getSpeed() * SPEED_SCALE * 1.08;
         double attackDir = team == Enums.TeamSide.HOME ? 1 : -1;
-        double goalX = team == Enums.TeamSide.HOME ? 100 : 0;
+        boolean st = (slot == 9);
+        boolean wing = (slot == 8 || slot == 10);
 
         if (state == Enums.PlayerState.WITH_BALL) {
             playWithBall(engine, true);
             return;
         }
-
         if (state == Enums.PlayerState.DEFENDING) {
-            boolean high = team == Enums.TeamSide.HOME ? ball.getPosition().x > 52 : ball.getPosition().x < 48;
+            boolean high = team == Enums.TeamSide.HOME
+                ? ball.getPosition().x > 52 : ball.getPosition().x < 48;
             if (high && ball.getOwner() != null) {
                 steerTowards(ball.getOwner().getPosition(), spd * 0.95);
             } else {
-                steerTowards(new Vector2D(homePosition.x - attackDir * 6,
+                steerTowards(new Vector2D(homePosition.x - attackDir * 5,
                     homePosition.y * 0.7 + ball.getPosition().y * 0.3), spd * 0.75);
             }
             return;
         }
-
         if (state == Enums.PlayerState.SUPPORTING) {
             if (ball.getOwner() == null) {
                 steerTowards(ball.getPosition(), spd * 1.1);
                 return;
             }
             Player owner = ball.getOwner();
-            double runX = owner.getPosition().x + attackDir * 16;
+            double runX = owner.getPosition().x + attackDir * (st ? 14 : 16);
             double runY = homePosition.y;
-            if (Math.abs(homePosition.y - 50) > 14) {
-                runY += (homePosition.y < 50 ? -6 : 6);
-            } else {
-                runY += (Math.random() < 0.5 ? -4 : 4);
-            }
+            if (wing) runY += (homePosition.y < 50 ? -7 : 7);
+            else runY += (Math.random() < 0.5 ? -3 : 3);
             steerTowards(new Vector2D(clamp(runX, 10, 90), clamp(runY, 8, 92)), spd);
             return;
         }
-
         steerTowards(new Vector2D(
-            homePosition.x + attackDir * 4,
+            homePosition.x + attackDir * 3,
             homePosition.y * 0.75 + ball.getPosition().y * 0.25
         ), spd * 0.6);
     }
@@ -289,7 +301,6 @@ public class Player {
             cooldownTicks = 9;
             return;
         }
-
         Player best = engine.findBestPassOption(this);
         double passP = attributes.getPassing() * (role == Enums.PlayerRole.DEFENDER ? 0.055 : 0.038);
         if (best != null && Math.random() < passP) {
@@ -300,18 +311,26 @@ public class Player {
             cooldownTicks = 6;
             return;
         }
-
         double channelY = clamp(position.y + (50 - position.y) * 0.1, 12, 88);
         steerTowards(new Vector2D(goalX, channelY), spd);
     }
 
-    private Vector2D defensiveLine(Ball ball) {
+    private Vector2D defensiveLinePos(Ball ball, boolean fullback) {
         double baseX = homePosition.x;
-        double pull = (ball.getPosition().x - 50) * 0.14;
+        double pull = (ball.getPosition().x - 50) * 0.12;
         if (team == Enums.TeamSide.HOME) baseX = clamp(homePosition.x + pull, 14, 50);
         else baseX = clamp(homePosition.x + pull, 50, 86);
-        double y = homePosition.y * 0.6 + ball.getPosition().y * 0.4;
-        return new Vector2D(baseX, clamp(y, 10, 90));
+        // laterais ficam mais abertos no Y
+        double yMix = fullback ? 0.25 : 0.4;
+        double y = homePosition.y * (1 - yMix) + ball.getPosition().y * yMix;
+        return new Vector2D(baseX, clamp(y, fullback ? 8 : 14, fullback ? 92 : 86));
+    }
+
+    /** Impede zagueiro de ocupar o espaço do goleiro */
+    private Vector2D clampAwayFromGoalMouth(Vector2D p) {
+        if (team == Enums.TeamSide.HOME && p.x < 11) p.x = 11;
+        if (team == Enums.TeamSide.AWAY && p.x > 89) p.x = 89;
+        return p;
     }
 
     private Player nearestThreat(MatchEngine engine) {
@@ -326,10 +345,16 @@ public class Player {
         return best;
     }
 
-    private boolean isInOwnBox(Vector2D pos) {
-        if (pos.y < BOX_Y_MIN || pos.y > BOX_Y_MAX) return false;
-        if (team == Enums.TeamSide.HOME) return pos.x <= BOX_DEPTH;
-        return pos.x >= 100 - BOX_DEPTH;
+    public boolean isInOwnPenaltyArea(Vector2D pos) {
+        if (pos.y < PENALTY_Y_MIN || pos.y > PENALTY_Y_MAX) return false;
+        if (team == Enums.TeamSide.HOME) return pos.x <= PENALTY_DEPTH;
+        return pos.x >= 100 - PENALTY_DEPTH;
+    }
+
+    private boolean isInOwnGoalArea(Vector2D pos) {
+        if (pos.y < 34 || pos.y > 66) return false;
+        if (team == Enums.TeamSide.HOME) return pos.x <= GOAL_AREA_DEPTH;
+        return pos.x >= 100 - GOAL_AREA_DEPTH;
     }
 
     private void holdShape(double f) {
@@ -352,16 +377,21 @@ public class Player {
         velocity.mult(0.86);
     }
 
-    private void keepInBounds() {
+    private void keepInBounds(MatchEngine engine) {
         if (role == Enums.PlayerRole.GOALKEEPER) {
-            // GK preso na própria área penal
+            // GK: preso na área do gol + um pouco da penal só no Y da boca
             if (team == Enums.TeamSide.HOME) {
-                position.x = clamp(position.x, 1.5, BOX_DEPTH);
+                position.x = clamp(position.x, 1.5, GOAL_AREA_DEPTH + 0.5);
             } else {
-                position.x = clamp(position.x, 100 - BOX_DEPTH, 98.5);
+                position.x = clamp(position.x, 100 - GOAL_AREA_DEPTH - 0.5, 98.5);
             }
-            position.y = clamp(position.y, BOX_Y_MIN, BOX_Y_MAX);
+            position.y = clamp(position.y, 36, 64);
+            velocity.x *= 0.5;
             return;
+        }
+        // Defensores: nunca dentro da boca do gol
+        if (role == Enums.PlayerRole.DEFENDER) {
+            position = clampAwayFromGoalMouth(position);
         }
         position.x = clamp(position.x, 2.5, 97.5);
         position.y = clamp(position.y, 2.5, 97.5);
