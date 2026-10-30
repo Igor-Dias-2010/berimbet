@@ -1092,7 +1092,7 @@
 
     .crash-plane {
       position: absolute;
-      transition: left .05s linear, top .05s linear, transform .05s linear;
+      transition: none;
       filter: drop-shadow(0 6px 12px rgba(0, 0, 0, .6));
       will-change: left, top, transform;
       z-index: 4;
@@ -3382,9 +3382,9 @@
     });
     const cn = (...classes) => classes.filter(Boolean).join(' ');
     const DIFFS = {
-      facil: { label: '😊 Fácil', win: 0.9, refund: 0.25, extra: 0, crashBase: 1.55, crashSpread: 7.2, crashCurve: 0.62, crashSpeed: 6200, on: 'bg-emerald-600 border-emerald-400 text-white', desc: 'Fácil: lucros 10% menores, mas ao perder você recebe 25% da aposta de volta.' },
-      normal: { label: '⚖️ Normal', win: 1, refund: 0, extra: 0, crashBase: 1.12, crashSpread: 5.2, crashCurve: 1.0, crashSpeed: 5000, on: 'bg-indigo-600 border-indigo-400 text-white', desc: 'Normal: pagamentos padrão do jogo.' },
-      dificil: { label: '🔥 Difícil', win: 1.3, refund: 0, extra: 0.25, crashBase: 1.01, crashSpread: 3.15, crashCurve: 1.65, crashSpeed: 4100, on: 'bg-red-600 border-red-400 text-white', desc: 'Difícil: lucros 30% maiores, mas perder custa +25% da aposta.' }
+      facil: { label: '😊 Fácil', win: 0.9, refund: 0.25, extra: 0, crashBase: 1.55, crashSpread: 7.2, crashCurve: 0.62, crashSpeed: 6200, minesDefault: 2, minesMax: 10, on: 'bg-emerald-600 border-emerald-400 text-white', desc: 'Fácil: crash explode mais tarde, Safe Cracker com 8 tentativas, menos minas; lucros 10% menores e 25% de reembolso na perda.' },
+      normal: { label: '⚖️ Normal', win: 1, refund: 0, extra: 0, crashBase: 1.12, crashSpread: 5.2, crashCurve: 1.0, crashSpeed: 5000, minesDefault: 3, minesMax: 15, on: 'bg-indigo-600 border-indigo-400 text-white', desc: 'Normal: dificuldade e pagamentos padrão do jogo.' },
+      dificil: { label: '🔥 Difícil', win: 1.3, refund: 0, extra: 0.25, crashBase: 1.01, crashSpread: 3.15, crashCurve: 1.65, crashSpeed: 4100, minesDefault: 5, minesMax: 20, on: 'bg-red-600 border-red-400 text-white', desc: 'Difícil: crash explode mais cedo, Safe Cracker com 4 tentativas, mais minas; lucros 30% maiores e perda extra de 25%.' }
     };
 
     const BASE_GAMES = [
@@ -3428,7 +3428,6 @@
           '• Blackjack Natural (2 cartas = 21): Paga 2.5x o valor apostado.\n' +
           '• Vitória comum: Paga 2x. Empate: Devolve a aposta.'
       },
-      { id: 'baccarat', name: 'Baccarat', category: 'Cartas', icon: '🎴', desc: 'Aposte na mão mais próxima do 9.', help: 'Objetivo: Chegar o mais próximo de 9 pontos.' },
       { id: 'plinko', name: 'Plinko', category: 'Física', icon: '🔴', desc: 'Solte as bolinhas e acerte os multiplicadores.', help: 'Objetivo: Obter os maiores multiplicadores nas pontas.' }
     ];
 
@@ -3441,7 +3440,6 @@
       slots: { desc: 'Três rolos, cinco símbolos. Trinca de 7️⃣ paga 50x e dois iguais devolvem metade.', risk: 'Médio', help: 'Como jogar:\n• Escolha a aposta e gire.\n• 3 iguais: 7️⃣ = 50x, 💎 = 20x, demais = 5x.\n• 2 iguais seguidos: 0,5x.' },
       bacbo: { desc: 'Dois dados para o Jogador, dois para a Banca. Quem somar mais leva. Empate paga alto.', risk: 'Médio', help: 'Como jogar:\n• Aposte em Jogador, Banca ou Empate.\n• Cada lado rola 2 dados; a maior soma vence.' },
       blackjack: { desc: 'Chegue o mais perto de 21 sem estourar. Dobre, divida e enfrente a banca.', risk: 'Baixo' },
-      baccarat: { desc: 'Cartas elegantes, regra simples: a mão mais próxima de 9 vence.', risk: 'Baixo', help: 'Como jogar:\n• Aposte em Jogador, Banca ou Empate.\n• Figuras e 10 valem 0; soma-se apenas o último dígito.\n• Ganha quem ficar mais perto de 9.' },
       plinko: { desc: 'Solte a bolinha entre os pinos e torça para ela cair nas pontas de 10x.', risk: 'Médio', help: 'Como jogar:\n• Escolha a aposta e solte a bola.\n• Os multiplicadores nas pontas pagam mais (10x); os do meio pagam menos (0,5x).' }
     };
 
@@ -3594,7 +3592,7 @@
       });
       const [activeMarketEffects, setActiveMarketEffects] = useState(() => loadStore('berimbet_market_effects_v1', { retry: 0, shield: 0, boost: 0, winCredit: 0 }));
       const [history, setHistory] = useState(() => loadStore('simbet_history', []));
-      const [favorites, setFavorites] = useState(() => loadStore('simbet_favorites', ['crash', 'bacbo', 'roulette']));
+      const [favorites, setFavorites] = useState(() => loadStore('simbet_favorites', []));
       const [recentGames, setRecentGames] = useState(() => loadStore('berimbet_recent_games_v1', []));
       const [profileName, setProfileName] = useState(() => loadStore('berimbet_profile_name', 'Jogador'));
       const [profileAvatar, setProfileAvatar] = useState(() => loadStore('berimbet_profile_avatar', ''));
@@ -4058,7 +4056,7 @@
     const Sidebar = ({ isOpen, closeMenu, hidden, toggleSidebar }) => {
       const { setView, favorites, setActiveGame, profileName, profileAvatar } = useAppState();
       const navItem = (v, icon, text) => (
-        <button onClick={() => { setView(v); closeMenu(); }} className="flex items-center w-full gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors text-left text-slate-300 hover:text-white">
+        <button onClick={() => { setView(v); closeMenu(); }} className="sidebar-nav-item flex items-center w-full gap-3 p-3 rounded-lg text-left text-slate-300 hover:text-white">
           <Icon path={Icons[icon]} className="w-5 h-5" /> <span>{text}</span>
         </button>
       );
@@ -4085,14 +4083,14 @@
             <div className="space-y-2">
               <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Principal</div>
               {navItem('lobby', 'Home', 'Início')}
-              <button onClick={() => { setActiveGame(null); setView('market'); closeMenu(); }} className="flex items-center w-full gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors text-left text-slate-300 hover:text-white"><Icon path={Icons.ShoppingBag} className="w-5 h-5" /> <span>Mercado</span></button>
+              <button onClick={() => { setActiveGame(null); setView('market'); closeMenu(); }} className="sidebar-nav-item flex items-center w-full gap-3 p-3 rounded-lg text-left text-slate-300 hover:text-white"><Icon path={Icons.ShoppingBag} className="w-5 h-5" /> <span>Mercado</span></button>
               {navItem('inventory', 'Trophy', 'Inventário')}
               <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-6 mb-2">Favoritos</div>
               {favorites.length === 0 ? <p className="text-xs text-slate-600 px-3">Nenhum favorito</p> :
                 favorites.map(favId => {
                   const game = GAMES.find(g => g.id === favId);
                   return game ? (
-                    <button key={favId} onClick={() => { saveLobbyScroll(); setActiveGame(game); setView('game'); closeMenu(); }} className="fav-item-in flex items-center w-full gap-3 p-2.5 rounded-lg hover:bg-slate-800 transition-colors text-left text-slate-400 hover:text-white text-sm">
+                    <button key={favId} onClick={() => { saveLobbyScroll(); setActiveGame(game); setView('game'); closeMenu(); }} className="fav-item-in sidebar-nav-item flex items-center w-full gap-3 p-2.5 rounded-lg text-left text-slate-400 hover:text-white text-sm">
                       <span>{game.icon}</span> <span>{game.name}</span>
                     </button>
                   ) : null;
@@ -5067,12 +5065,11 @@
           if (hackSettings.crashForceInstant) crashPoint = 1.01;
         }
         const startTime = Date.now() - Math.log(Math.max(1.0001, fromMulti)) * D.crashSpeed;
-        if (intervalRef.current) clearInterval(intervalRef.current);
-        intervalRef.current = setInterval(() => {
+        if (intervalRef.current) { cancelAnimationFrame(intervalRef.current); intervalRef.current = null; }
+        const tick = () => {
           const elapsed = Date.now() - startTime;
           const currentMulti = Math.exp(elapsed / D.crashSpeed);
           if (currentMulti >= crashPoint) {
-            clearInterval(intervalRef.current);
             intervalRef.current = null;
             multRef.current = crashPoint;
             setMultiplier(crashPoint);
@@ -5092,8 +5089,10 @@
           } else {
             multRef.current = currentMulti;
             setMultiplier(currentMulti);
+            intervalRef.current = requestAnimationFrame(tick);
           }
-        }, 32);
+        };
+        intervalRef.current = requestAnimationFrame(tick);
       };
 
       const startGame = () => {
@@ -5111,7 +5110,7 @@
 
       const cashOut = () => {
         if (gameState !== 'playing' || !betIdRef.current) return;
-        clearInterval(intervalRef.current);
+        if (intervalRef.current) cancelAnimationFrame(intervalRef.current);
         intervalRef.current = null;
         const cashMulti = multRef.current;
         setMultiplier(cashMulti);
@@ -5121,7 +5120,7 @@
         if (hackSettings.effectsEnabled) playSoundEffect('coin', hackSettings.sfxVolume);
       };
 
-      useEffect(() => () => clearInterval(intervalRef.current), []);
+      useEffect(() => () => { if (intervalRef.current) cancelAnimationFrame(intervalRef.current); }, []);
 
       return (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 text-center max-w-xl mx-auto space-y-5">
@@ -5247,9 +5246,10 @@
     };
 
     const GameMines = () => {
-      const { placeBet, settleBet, hackSettings, balance, showNotification, registerRevive } = useAppState();
+      const { placeBet, settleBet, hackSettings, balance, showNotification, registerRevive, diffs } = useAppState();
+      const minesDiff = DIFFS[(diffs && diffs.mines) || 'normal'] || DIFFS.normal;
       const [betAmount, setBetAmount] = useState(10);
-      const [mineCount, setMineCount] = useState(3);
+      const [mineCount, setMineCount] = useState(minesDiff.minesDefault || 3);
       const [gameState, setGameState] = useState('betting');
       const [grid, setGrid] = useState(Array(25).fill({ revealed: false, isMine: false }));
       const [currentBetId, setCurrentBetId] = useState(null);
@@ -5348,7 +5348,7 @@
             <div className="flex flex-wrap gap-2 items-center justify-center mt-4">
               <input type="number" min="1" value={betAmount} onChange={e => setBetAmount(Number(e.target.value))} className="bg-slate-950 border border-slate-800 p-3 text-center rounded-lg text-white w-24" /><QuickBet value={betAmount} onChange={setBetAmount} />
               <select value={mineCount} onChange={e => setMineCount(Number(e.target.value))} className="bg-slate-950 border border-slate-800 p-3 rounded-lg text-white">
-                {[1, 3, 5, 10, 20].map(m => <option key={m} value={m}>{m} Minas</option>)}
+                {[1, 2, 3, 5, 10, 15, 20].filter(m => m <= (minesDiff.minesMax || 20)).map(m => <option key={m} value={m}>{m} Minas</option>)}
               </select>
               <button onClick={startMines} className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-6 py-3 rounded-lg flex-1">{gameState === 'result' ? 'NOVA RODADA' : 'INICIAR MINES'}</button>
             </div>
@@ -6794,7 +6794,7 @@
 
     // --- JOGOS ADICIONAIS ---
     const GameAdditional = () => {
-      const { activeGame, placeBet, settleBet, hackSettings } = useAppState();
+      const { activeGame, placeBet, settleBet, hackSettings, diffs: appDiffs } = useAppState();
       const id = activeGame.id;
       const [bet, setBet] = useState(10);
       const [busy, setBusy] = useState(false);
@@ -6810,15 +6810,25 @@
       const [safeAttempts, setSafeAttempts] = useState(0);
       const [safeActive, setSafeActive] = useState(0);
       const [safeJustSelected, setSafeJustSelected] = useState(-1);
+      const [safeDone, setSafeDone] = useState(false);
       const safeRefs = useRef([]);
       const safeBetRef = useRef(null);
+      const safeDiffKey = (appDiffs && appDiffs.safecracker) || 'normal';
+      const safeMaxAttempts = safeDiffKey === 'facil' ? 8 : safeDiffKey === 'dificil' ? 4 : 6;
+      const safeMultipliers = safeDiffKey === 'facil' ? [12, 9, 7, 5, 4, 3, 2.5, 2] : safeDiffKey === 'dificil' ? [30, 20, 12, 7] : [20, 14, 10, 7, 5, 3];
+
+      const resetSafeCracker = () => {
+        setSafeSecret([...moneySymbols].sort(() => Math.random() - 0.5));
+        setSafeGuess(['', '', '', '', '']); setSafeHistory([]); setSafeAttempts(0); setSafeActive(0); setSafeJustSelected(-1);
+        setSafeDone(false); setBusy(false); setResult(null); safeBetRef.current = null;
+      };
 
       useEffect(() => {
         setBet(10); setBusy(false); setResult(null); setSelected(null);
         setTreasurePositions(Array.from({ length: 9 }, () => Number((Math.random() * 10).toFixed(2))));
         setCardBattle({ player: [], house: [] }); setCardStage('idle');
         setSafeSecret([...moneySymbols].sort(() => Math.random() - 0.5));
-        setSafeGuess(['', '', '', '', '']); setSafeHistory([]); setSafeAttempts(0); setSafeActive(0); setSafeJustSelected(-1); safeBetRef.current = null;
+        setSafeGuess(['', '', '', '', '']); setSafeHistory([]); setSafeAttempts(0); setSafeActive(0); setSafeJustSelected(-1); setSafeDone(false); safeBetRef.current = null;
       }, [id]);
 
       const startBet = (name, details) => placeBet(bet, name, details);
@@ -6865,7 +6875,7 @@
       };
 
       const submitSafeCracker = () => {
-        if (busy || safeAttempts >= 6 || safeGuess.some(v => !moneySymbols.includes(v))) return;
+        if (busy || safeDone || safeAttempts >= safeMaxAttempts || safeGuess.some(v => !moneySymbols.includes(v))) return;
         if (!safeBetRef.current) {
           const newBetId = startBet('Safe Cracker', 'Tentativa de abertura');
           if (!newBetId) return;
@@ -6881,20 +6891,24 @@
         });
         const history = [...safeHistory, { guess: [...safeGuess], feedback }];
         const won = feedback.every(x => x === 'correct');
-        const multipliers = [20, 14, 10, 7, 5, 3];
+        const multipliers = safeMultipliers;
         setSafeHistory(history); setSafeAttempts(attempt);
-        setSafeGuess(['', '', '', '', '']); setSafeActive(0); setSafeJustSelected(-1);
+        if (!won) {
+          setSafeGuess(['', '', '', '', '']); setSafeActive(0); setSafeJustSelected(-1);
+        }
         setTimeout(() => {
           if (won) {
-            const mult = multipliers[attempt - 1];
+            const mult = multipliers[Math.min(attempt - 1, multipliers.length - 1)];
+            setSafeDone(true);
             setResult({ text: `Cofre aberto em ${attempt} tentativa${attempt > 1 ? 's' : ''}! ${mult}x`, good: true });
             finish(betId, mult, `Safe Cracker: combinação descoberta em ${attempt} tentativa${attempt > 1 ? 's' : ''}`);
-          } else if (attempt >= 6) {
+          } else if (attempt >= safeMaxAttempts) {
+            setSafeDone(true);
             setResult({ text: 'O cofre permaneceu fechado. A combinação não foi descoberta.', good: false });
-            finish(betId, 0, 'Safe Cracker: 6 tentativas sem acerto');
+            finish(betId, 0, `Safe Cracker: ${safeMaxAttempts} tentativas sem acerto`);
           } else {
             setBusy(false);
-            setResult({ text: `Tentativa ${attempt}/6 registrada. Restam ${6 - attempt}.`, good: false });
+            setResult({ text: `Tentativa ${attempt}/${safeMaxAttempts} registrada. Restam ${safeMaxAttempts - attempt}.`, good: false });
           }
         }, 420);
       };
@@ -6955,11 +6969,11 @@
               <div className="rounded-2xl border border-amber-500/30 bg-slate-950 p-5">
                 <div className="text-5xl mb-2">💰</div>
                 <div className="text-xs font-black uppercase tracking-[.25em] text-amber-300">Cofre Financeiro</div>
-                <div className="text-xs text-slate-500 mt-2">Tentativa {Math.min(safeAttempts + 1, 6)}/6 · Multiplicador: {safeAttempts < 6 ? [20, 14, 10, 7, 5, 3][safeAttempts] + 'x' : '—'}</div>
+                <div className="text-xs text-slate-500 mt-2">Tentativa {Math.min(safeAttempts + (safeDone ? 0 : 1), safeMaxAttempts)}/{safeMaxAttempts} · Multiplicador: {!safeDone && safeAttempts < safeMaxAttempts ? (safeMultipliers[safeAttempts] + 'x') : '—'}</div>
               </div>
               <div className="flex justify-center gap-2 sm:gap-3">
                 {safeGuess.map((symbol, i) => (
-                  <div key={i} className={cn('w-14 h-16 sm:w-16 sm:h-20 rounded-xl border bg-slate-950 text-3xl text-center font-black grid place-items-center transition-all duration-200', safeJustSelected === i ? 'safe-symbol-pop border-amber-300' : '', i === safeActive && safeAttempts < 6 ? 'border-amber-400 ring-1 ring-amber-400/30 safe-active-pulse' : i < safeActive ? 'border-slate-600' : 'border-slate-800 opacity-50')} aria-label={`Símbolo ${i + 1}`}>{symbol || '•'}</div>
+                  <div key={i} className={cn('w-14 h-16 sm:w-16 sm:h-20 rounded-xl border bg-slate-950 text-3xl text-center font-black grid place-items-center transition-all duration-200', safeJustSelected === i ? 'safe-symbol-pop border-amber-300' : '', i === safeActive && !safeDone && safeAttempts < safeMaxAttempts ? 'border-amber-400 ring-1 ring-amber-400/30 safe-active-pulse' : i < safeActive ? 'border-slate-600' : 'border-slate-800 opacity-50')} aria-label={`Símbolo ${i + 1}`}>{symbol || '•'}</div>
                 ))}
               </div>
               <div className="text-xs text-slate-500 text-center">Escolha um símbolo abaixo. O próximo campo só é liberado depois que o anterior for preenchido.</div>
@@ -6970,7 +6984,7 @@
                     <button
                       key={symbol}
                       type="button"
-                      disabled={busy || safeAttempts >= 6 || safeActive >= 5}
+                      disabled={busy || safeDone || safeAttempts >= safeMaxAttempts || safeActive >= 5}
                       onClick={() => updateSafeGuess(safeActive, symbol)}
                       className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl border border-slate-700 bg-slate-950 hover:border-amber-400 hover:bg-slate-800 hover:-translate-y-0.5 active:scale-90 text-3xl transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
                       aria-label={`Escolher ${symbol}`}
@@ -6991,10 +7005,14 @@
             </div>
           )}
 
-          <BetInput value={bet} onChange={setBet} disabled={busy || (id === 'safecracker' && safeAttempts > 0)} />
-          <button onClick={play} disabled={busy || (id === 'treasurehunt' && selected === null) || (id === 'safecracker' && (safeAttempts >= 6 || safeGuess.some(v => !moneySymbols.includes(v))))} className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-3 rounded-lg disabled:opacity-50">
-            {busy ? 'PROCESSANDO...' : id === 'cardbattle' ? 'DISTRIBUIR CARTAS' : id === 'safecracker' ? 'TENTAR ABRIR O COFRE' : 'JOGAR'}
-          </button>
+          <BetInput value={bet} onChange={setBet} disabled={busy || (id === 'safecracker' && (safeAttempts > 0 || safeDone))} />
+          {id === 'safecracker' && safeDone ? (
+            <button onClick={resetSafeCracker} className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-3 rounded-lg">JOGAR DE NOVO</button>
+          ) : (
+            <button onClick={play} disabled={busy || (id === 'treasurehunt' && selected === null) || (id === 'safecracker' && (safeDone || safeAttempts >= safeMaxAttempts || safeGuess.some(v => !moneySymbols.includes(v))))} className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-3 rounded-lg disabled:opacity-50">
+              {busy ? 'PROCESSANDO...' : id === 'cardbattle' ? 'DISTRIBUIR CARTAS' : id === 'safecracker' ? 'TENTAR ABRIR O COFRE' : 'JOGAR'}
+            </button>
+          )}
           {result && <div className={cn('rounded-xl border p-3 font-bold text-sm', result.good ? 'bg-emerald-950/50 border-emerald-500 text-emerald-300' : 'bg-red-950/50 border-red-500 text-red-300')}>{result.text}</div>}
         </div>
       );
@@ -10002,7 +10020,8 @@
               {cats.map(c => <button key={c} onClick={() => setCat(c)} className={cn("px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap border", cat === c ? "bg-indigo-600 border-indigo-400 text-white" : "bg-slate-900 border-slate-700 text-slate-400 hover:text-white")}>{c}</button>)}
             </div>
             {(() => {
-              const recentList = (recentGames || []).map(id => GAMES.find(g => g.id === id)).filter(Boolean).slice(0, 5);
+              const recentLimit = (typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches) ? 10 : 5;
+              const recentList = (recentGames || []).map(id => GAMES.find(g => g.id === id)).filter(Boolean).slice(0, recentLimit);
               if (!recentList.length) return null;
               return (
                 <section className="recent-played-section space-y-3">
@@ -10250,7 +10269,6 @@
                 {(activeGame.engine || activeGame.id) === 'bacbo' && <GameBacBo />}
                 {(activeGame.engine || activeGame.id) === 'blackjack' && <GameBlackjack />}
                 {(activeGame.engine || activeGame.id) === 'roulette' && <GameRoulette />}
-                {(activeGame.engine || activeGame.id) === 'baccarat' && <GameBaccarat />}
                 {(activeGame.engine || activeGame.id) === 'plinko' && <GamePlinko />}
                 {(activeGame.engine || activeGame.id) === 'aviator' && <GameAviator />}
                 {(activeGame.engine || activeGame.id) === 'balloon' && <GameBalloon />}
@@ -13696,6 +13714,55 @@
     html[data-theme="light"] .custom-scrollbar::-webkit-scrollbar-thumb {
       background: linear-gradient(180deg, #e8c866, #c9a227) !important;
       border-color: #ebe6db !important;
+    }
+  </style>
+
+
+  <style id="fix-corrections">
+    /* Sidebar: hover suave sem crescer */
+    aside button.sidebar-nav-item {
+      transition: background-color .22s ease, color .22s ease, border-color .22s ease !important;
+      transform: none !important;
+    }
+    aside button.sidebar-nav-item:not(:disabled):hover {
+      transform: none !important;
+      filter: none !important;
+      background-color: rgba(201, 162, 39, .10) !important;
+      color: #f4d978 !important;
+    }
+    aside button.sidebar-nav-item:not(:disabled):active {
+      transform: none !important;
+    }
+
+    /* Jogos: padding-inline fixo de 5px — botões nunca encostam na borda */
+    .game-surface {
+      padding-inline: 5px !important;
+      box-sizing: border-box;
+    }
+    .game-surface > * {
+      max-width: 100%;
+    }
+    /* evita scale global dos botões empurrarem para fora da moldura */
+    .game-surface button:not(:disabled):hover {
+      transform: translateY(-1px) scale(1.02) !important;
+    }
+
+    /* Remove scroll desnecessário no site */
+    html, body {
+      overflow-x: hidden !important;
+      max-width: 100vw !important;
+    }
+    body {
+      overflow-y: auto;
+    }
+    main, #root, #root > div {
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+    /* evita barra vertical fantasma em containers internos sem necessidade */
+    .game-surface {
+      overflow-x: hidden;
+      overflow-y: visible;
     }
   </style>
 
