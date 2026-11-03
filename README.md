@@ -1,4 +1,4 @@
-# bsBET
+# BerimBET
 
 Este é um simulador de palpites esportivos estritamente fictício e recreativo. Ele foi criado exclusivamente para fins de entretenimento, teste de lógica e estudo de desenvolvimento.
 
